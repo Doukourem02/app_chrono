@@ -702,6 +702,7 @@ Contenu de la facture générée :
 | `active` | Admin (activation) | Partenaire opérationnel — commandes sous contrat, quota, portail. |
 | `inactive` | **Admin Krono** (sortie programme, impayé, etc.) | Agrément retiré ou gelé côté contrat — portail bloqué. **Ce n'est pas** le simple passage « mode perso » dans l'app. |
 | `suspended` | **Admin Krono** | Suspension contractuelle, litige — levée par l'admin. |
+| `merged` | **Admin Krono** (fusion de fiches) | Fiche en double archivée après fusion — jamais supprimée, `merged_into_partner_id` pointe vers la fiche survivante. Exclue de la liste "Tous les statuts" par défaut. |
 
 **Séparation `users.is_business` (mode business à l'usage) / `partners.status` (agrément)** : couper le mode business dans le profil app met `is_business` à `false` via `setBusinessMode` (endpoint dédié) — **sans** modifier `partners.status`. Le rallumage avec un partenaire déjà `active` remet `is_business` à `true` sans repasser en `pending`. Si le partenaire est `inactive` côté agrément, le portail reste bloqué jusqu'à action admin, même si l'utilisateur remet le toggle.
 
@@ -709,9 +710,19 @@ Contenu de la facture générée :
 
 **`activatePartner` (admin)** : `pending` → `active`, création de `partner_subscriptions` **active** si un plan forfait est déjà choisi, invitation portail best-effort sur `partners.email`.
 
-**Séparation inactif administratif / sanction** : les actions admin « Désactiver » / « Suspendre » doivent rester **tracées** (`actor = admin`) dans les audits pour ne pas être confondues avec le toggle utilisateur (table d'audit dédiée pas encore créée — voir `docs/taches.md`).
+**Séparation inactif administratif / sanction** : les actions admin « Désactiver » / « Suspendre » restent **tracées** (`actor = admin`) dans `partner_audit_logs` (migration 043) pour ne pas être confondues avec le toggle utilisateur.
 
 **Lien `partner_users`** : conservé pour l'historique ; une désactivation agrément ne supprime pas automatiquement le lien utilisateur ↔ partenaire.
+
+**Fusion de deux fiches partenaire — implémentée le 2026-07-27** (`POST /api/partners/:id/merge`, body `{ mergeFromPartnerId }`, réservé `super_admin`, transaction unique `partnerMergeController.ts`). La fiche `:id` est la survivante, `mergeFromPartnerId` est archivée (`status = 'merged'`, jamais supprimée). Règles appliquées :
+- **Abonnement en double** : celui du palier le plus élevé est gardé actif (`starter` < `pro` < `business`), l'autre est désactivé ; en cas d'égalité de palier, celui avec le plus de temps restant (`ends_at`) gagne. Les deux restent rattachés à la fiche survivante pour l'historique.
+- **Quota mensuel** (`partner_usage`, `UNIQUE(partner_id, month)`) : les mois en commun sont **sommés**, pas écrasés.
+- **Historique** (commandes, factures, tournées, demandes de livreur) : toujours réattribué à la fiche survivante, jamais perdu.
+- **Livreurs dédiés** (`partner_drivers`) : le doublon `(partner_id, driver_user_id)` est dédoublonné ; un seul livreur par défaut par partenaire est préservé (`partner_drivers_one_default_per_partner_uidx`).
+- **Accès équipe** (`partner_users`) : transfert automatique vers la fiche survivante, sans réinvitation (le rôle est toujours `owner` depuis la migration 044, donc pas de conflit de rôle possible).
+- **E-mail de la fiche archivée mis à `NULL`** pour libérer `partners_email_unique_idx` (l'identité canonique devient la fiche survivante).
+- Log d'audit `partner_audit_logs` (action `'merge'`) — protégé par un `SAVEPOINT` pour qu'un échec d'insertion du log n'annule jamais la fusion elle-même.
+- Migration associée : `048_partner_merge_support.sql` (colonne `merged_into_partner_id`, statut `'merged'`, action `'merge'` sur `partner_audit_logs`).
 
 ---
 

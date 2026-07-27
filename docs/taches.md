@@ -31,11 +31,7 @@ Reste à faire (vérifié : aucun de ces tokens n'a jamais été commité dans l
 
 ## B2B / Partenaires
 
-**Nécessitent une décision produit avant tout code (rien à faire seul dessus) :**
-- **Fusion de deux fiches partenaire** — pas implémenté, mais règles validées le 2026-07-27, prêtes à coder (action admin unique "Fusionner deux fiches", réservée `super_admin`, transaction unique + log de l'action) :
-  - Abonnement en double : garder celui qui avantage le plus le partenaire (palier le plus élevé, sinon le plus de temps restant), pas automatiquement le plus ancien.
-  - Historique commandes/factures : jamais supprimé, toujours réattribué (`partner_id`) vers la fiche survivante ; la fiche fusionnée est archivée (statut "fusionnée" + pointeur vers la survivante), pas supprimée physiquement.
-  - Accès employé : transfert automatique vers la fiche survivante, pas de réinvitation manuelle — sauf conflit de rôle réel entre les deux fiches (rare), à trancher au cas par cas par un admin.
+**Nécessite une décision produit avant tout code (rien à faire seul dessus) :**
 - **E-mail portail obligatoire à l'étape forfait** (`app_krono/app/(auth)/business-onboarding.tsx:106`, actuellement `portalEmail.trim() || undefined`, jamais bloquant) : la tâche elle-même est conditionnelle ("si le produit l'exige") — décision à prendre : le rendre obligatoire ou non.
 
 Roadmap produit post-lancement (peu prioritaire) : déplacée dans `docs/roadmap_produit.md`.

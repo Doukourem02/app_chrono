@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, Building2, Eye, CheckCircle, XCircle, Zap, Trash2, AlertTriangle } from 'lucide-react'
+import { Search, Plus, Building2, Eye, CheckCircle, XCircle, Zap, Trash2, AlertTriangle, GitMerge } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import { supabase } from '@/lib/supabase'
 import { ScreenTransition, SkeletonLoader } from '@/components/animations'
@@ -30,6 +30,7 @@ const STATUS_STYLE: Record<Partner['status'], { color: string; bg: string; Icon:
   pending:   { color: '#D97706',                 bg: '#FEF3C7',               Icon: Zap         },
   inactive:  { color: themeColors.redPrimary,    bg: themeColors.redLight,    Icon: XCircle     },
   suspended: { color: themeColors.redPrimary,    bg: themeColors.redLight,    Icon: XCircle     },
+  merged:    { color: themeColors.grayDark,      bg: themeColors.grayLight,   Icon: GitMerge    },
 }
 
 // ─── Modal créer partenaire ───────────────────────────────────────────────────
@@ -234,6 +235,9 @@ export default function PartnersPage() {
 
   const filtered = useMemo(() => {
     let list = partners
+    if (statusFilter === 'all') {
+      list = list.filter(p => p.status !== 'merged')
+    }
     if (segmentFilter === 'small') {
       list = list.filter(p => p.plan === 'starter')
     } else if (segmentFilter === 'large') {
@@ -246,7 +250,7 @@ export default function PartnersPage() {
       p.email?.toLowerCase().includes(q) ||
       p.phone?.includes(q)
     )
-  }, [partners, search, segmentFilter])
+  }, [partners, search, segmentFilter, statusFilter])
 
   return (
     <ScreenTransition>
@@ -296,6 +300,7 @@ export default function PartnersPage() {
               ['active', t('partnersPage.status.active')],
               ['inactive', t('partnersPage.status.inactive')],
               ['suspended', t('partnersPage.status.suspended')],
+              ['merged', t('partnersPage.status.merged')],
             ].map(([v, l]) => (
               <option key={v} value={v}>{l}</option>
             ))}

@@ -110,6 +110,30 @@ export class AdminPartnerApi extends AdminFleetApi {
     }
   }
 
+  async mergePartners(survivorId: string, mergeFromPartnerId: string): Promise<ApiResponse<{ survivor_id: string; merged_partner_id: string }>> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/partners/${survivorId}/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mergeFromPartnerId }),
+      })
+      const result: unknown = await response.json().catch(() => ({}))
+      if (response.ok && isApiResponse(result) && result.success) {
+        const warnings = (result as { warnings?: string[] }).warnings
+        return {
+          success: true,
+          data: result.data as { survivor_id: string; merged_partner_id: string },
+          message: warnings && warnings.length > 0 ? warnings.join(' · ') : undefined,
+        }
+      }
+      const msg = isApiResponse(result) && result.message ? result.message : 'Fusion impossible'
+      return { success: false, message: msg }
+    } catch (error) {
+      logger.error('[adminApiService] mergePartners:', error)
+      return { success: false, message: 'Erreur réseau' }
+    }
+  }
+
   async activatePartnerSubscription(partnerId: string, subId: string, payment?: PartnerPaymentPayload): Promise<ApiResponse<import('@/types').PartnerSubscription>> {
     try {
       const response = await this.fetchWithAuth(

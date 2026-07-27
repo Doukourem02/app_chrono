@@ -148,7 +148,8 @@
       "active": "Active",
       "pending": "Pending",
       "inactive": "Inactive",
-      "suspended": "Suspended"
+      "suspended": "Suspended",
+      "merged": "Merged"
     },
     "createModal": {
       "title": "New partner",

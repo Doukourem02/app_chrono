@@ -71,11 +71,12 @@ export interface Partner {
   name: string
   email?: string | null
   phone?: string | null
-  status: 'active' | 'inactive' | 'suspended' | 'pending'
+  status: 'active' | 'inactive' | 'suspended' | 'pending' | 'merged'
   plan?: string | null
   commission_rate: number
   use_preferred_drivers?: boolean
   notes?: string | null
+  merged_into_partner_id?: string | null
   created_at: string
 }
 

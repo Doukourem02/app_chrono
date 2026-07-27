@@ -160,6 +160,128 @@ function DeletePartnerConfirmModal({
   )
 }
 
+// ─── Modal fusionner deux fiches partenaire ────────────────────────────────────
+function MergePartnerModal({
+  partnerId,
+  partnerName,
+  onClose,
+  onMerged,
+}: {
+  partnerId: string
+  partnerName: string
+  onClose: () => void
+  onMerged: (message?: string) => void
+}) {
+  const [search, setSearch] = useState('')
+  const [candidates, setCandidates] = useState<import('@/types').Partner[]>([])
+  const [loadingList, setLoadingList] = useState(true)
+  const [selected, setSelected] = useState<import('@/types').Partner | null>(null)
+  const [confirming, setConfirming] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    adminApiService.getPartners().then((result) => {
+      if (!active) return
+      setLoadingList(false)
+      if (result.success && result.data) {
+        setCandidates(result.data.filter((p) => p.id !== partnerId && p.status !== 'merged'))
+      }
+    })
+    return () => { active = false }
+  }, [partnerId])
+
+  const filtered = candidates.filter((p) => {
+    const q = search.trim().toLowerCase()
+    if (!q) return true
+    return p.name.toLowerCase().includes(q) || (p.email ?? '').toLowerCase().includes(q)
+  })
+
+  const handleConfirm = async () => {
+    if (!selected) return
+    setConfirming(true)
+    setError('')
+    const result = await adminApiService.mergePartners(partnerId, selected.id)
+    setConfirming(false)
+    if (result.success) {
+      onMerged(result.message)
+    } else {
+      setError(result.message ?? 'Impossible de fusionner ces fiches.')
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+      <div style={{ backgroundColor: themeColors.cardBg, borderRadius: 16, padding: 28, width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <AlertTriangle size={22} color={themeColors.redPrimary} />
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: themeColors.textPrimary }}>Fusionner deux fiches</h2>
+        </div>
+
+        {!selected ? (
+          <>
+            <p style={{ fontSize: 13, color: themeColors.textSecondary, marginBottom: 12 }}>
+              Choisis la fiche en double à fusionner dans <strong style={{ color: themeColors.textPrimary }}>{partnerName}</strong>. Son historique (commandes, factures, équipe) sera transféré ici, puis elle sera archivée.
+            </p>
+            <div style={{ position: 'relative', marginBottom: 12 }}>
+              <Search size={14} style={{ position: 'absolute', left: 12, top: 12, color: themeColors.textSecondary }} />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Rechercher par nom ou email..."
+                style={{ width: '100%', padding: '10px 14px 10px 34px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, fontSize: 14, color: themeColors.textPrimary, backgroundColor: themeColors.cardBg, boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ maxHeight: 260, overflowY: 'auto', border: `1px solid ${themeColors.cardBorder}`, borderRadius: 8 }}>
+              {loadingList ? (
+                <p style={{ padding: 16, fontSize: 13, color: themeColors.textSecondary }}>Chargement…</p>
+              ) : filtered.length === 0 ? (
+                <p style={{ padding: 16, fontSize: 13, color: themeColors.textSecondary }}>Aucune fiche trouvée.</p>
+              ) : (
+                filtered.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setSelected(p)}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', borderBottom: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', cursor: 'pointer' }}
+                  >
+                    <p style={{ fontSize: 14, fontWeight: 600, color: themeColors.textPrimary }}>{p.name}</p>
+                    <p style={{ fontSize: 12, color: themeColors.textSecondary }}>{p.email ?? 'Sans email'} · {p.status}</p>
+                  </button>
+                ))
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+              <button type="button" onClick={onClose} style={{ padding: '10px 20px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', color: themeColors.textPrimary, fontSize: 14, cursor: 'pointer' }}>
+                Annuler
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: 14, color: themeColors.textSecondary, lineHeight: 1.5 }}>
+              Fusionner <strong style={{ color: themeColors.textPrimary }}>{selected.name}</strong> ({selected.email ?? 'sans email'}) dans <strong style={{ color: themeColors.textPrimary }}>{partnerName}</strong> ?
+            </p>
+            <p style={{ fontSize: 13, color: themeColors.textSecondary, marginTop: 8 }}>
+              {selected.name} sera archivée (statut « fusionnée »), jamais supprimée. Abonnement, quota, factures, commandes, livreurs dédiés et accès équipe sont transférés automatiquement.
+            </p>
+            {error && <p style={{ fontSize: 13, color: themeColors.redPrimary, marginTop: 12 }}>{error}</p>}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+              <button type="button" onClick={() => setSelected(null)} style={{ padding: '10px 20px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', color: themeColors.textPrimary, fontSize: 14, cursor: 'pointer' }}>
+                Retour
+              </button>
+              <button type="button" onClick={handleConfirm} disabled={confirming} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', backgroundColor: themeColors.redPrimary, color: '#fff', fontSize: 14, fontWeight: 600, cursor: confirming ? 'not-allowed' : 'pointer', opacity: confirming ? 0.7 : 1 }}>
+                {confirming ? 'Fusion…' : 'Confirmer la fusion'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function PaymentConfirmModal({
   title,
   amount,
@@ -688,6 +810,8 @@ export default function PartnerDetailPage() {
   const [showCreateSub, setShowCreateSub] = useState(false)
   const [showInvite, setShowInvite] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
+  const [showMerge, setShowMerge] = useState(false)
+  const [mergeNotice, setMergeNotice] = useState('')
   const [payingInvoice, setPayingInvoice] = useState<PartnerInvoice | null>(null)
   const [statusLoading, setStatusLoading] = useState(false)
 
@@ -951,20 +1075,48 @@ export default function PartnerDetailPage() {
         )}
       </div>
 
-      {/* Suppression (super_admin) */}
-      {isSuperAdmin && (
+      {/* Fiche fusionnée dans une autre — lecture seule */}
+      {partner.status === 'merged' && (
+        <div style={{ padding: '12px 16px', backgroundColor: themeColors.grayLight, borderRadius: 10, border: `1px solid ${themeColors.cardBorder}` }}>
+          <p style={{ fontSize: 13, color: themeColors.textSecondary }}>
+            Cette fiche a été fusionnée
+            {partner.merged_into_partner_id ? (
+              <> dans <a href={`/partners/${partner.merged_into_partner_id}`} style={{ color: themeColors.purplePrimary, fontWeight: 600 }}>une autre fiche</a></>
+            ) : null}
+            . Elle est archivée, son historique reste consultable.
+          </p>
+        </div>
+      )}
+
+      {mergeNotice && (
+        <div style={{ padding: '12px 16px', backgroundColor: themeColors.greenLight, borderRadius: 10, border: `1px solid ${themeColors.greenPrimary}` }}>
+          <p style={{ fontSize: 13, color: themeColors.greenPrimary }}>{mergeNotice}</p>
+        </div>
+      )}
+
+      {/* Suppression / fusion (super_admin) */}
+      {isSuperAdmin && partner.status !== 'merged' && (
         <div style={{ backgroundColor: themeColors.redLight, border: `1px solid ${themeColors.redPrimary}`, borderRadius: 12, padding: '16px 20px' }}>
           <h2 style={{ fontSize: 15, fontWeight: 700, color: themeColors.redPrimary, marginBottom: 8 }}>Zone sensible</h2>
           <p style={{ fontSize: 13, color: themeColors.textSecondary, marginBottom: 12 }}>
             Supprimer définitivement ce partenaire et ses données de facturation B2B. Les commandes historiques conservent une trace sans lien partenaire.
           </p>
-          <button
-            type="button"
-            onClick={() => setShowDelete(true)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, border: 'none', backgroundColor: themeColors.redPrimary, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-          >
-            <Trash2 size={15} /> Supprimer le partenaire
-          </button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setShowDelete(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, border: 'none', backgroundColor: themeColors.redPrimary, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            >
+              <Trash2 size={15} /> Supprimer le partenaire
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowMerge(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, border: `1px solid ${themeColors.redPrimary}`, backgroundColor: 'transparent', color: themeColors.redPrimary, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            >
+              Fusionner une fiche en double
+            </button>
+          </div>
         </div>
       )}
 
@@ -992,6 +1144,20 @@ export default function PartnerDetailPage() {
           onDeleted={() => {
             queryClient.invalidateQueries({ queryKey: ['partners'] })
             router.push('/partners')
+          }}
+        />
+      )}
+
+      {showMerge && partner && (
+        <MergePartnerModal
+          partnerId={id}
+          partnerName={partner.name}
+          onClose={() => setShowMerge(false)}
+          onMerged={(message) => {
+            setShowMerge(false)
+            setMergeNotice(message ? `Fusion effectuée. ${message}` : 'Fusion effectuée.')
+            refresh()
+            queryClient.invalidateQueries({ queryKey: ['partners'] })
           }}
         />
       )}
