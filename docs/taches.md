@@ -21,7 +21,7 @@ Reste à faire (vérifié : aucun de ces tokens n'a jamais été commité dans l
 
 - Tester le chemin "base Supabase vide → migrations 001 à 041" de bout en bout (nécessite une branche Supabase payante, pas encore lancée).
 - Vérifier sur un vrai appareil les alertes push de solde commission livreur (`commissionService.checkAndSendAlerts`).
-- **Tester le flux d'invitation staff de bout en bout** : inviter un vrai email depuis la page Utilisateurs (en tant que `super_admin`), vérifier la réception du mail et la définition du mot de passe via `/reset-password`.
+- **Remplacer l'email/téléphone de support placeholder** (`app_krono/app/profile/support.tsx` et `driver_krono/app/profile/support.tsx`) : actuellement `support@chrono.com` (ancienne marque) et `+225 00 00 00 00 00` (faux numéro). Donner le vrai email et numéro de support Krono.
 
 ## OTP / Auth (Orange CI)
 
@@ -32,33 +32,13 @@ Reste à faire (vérifié : aucun de ces tokens n'a jamais été commité dans l
 ## B2B / Partenaires
 
 **Nécessitent une décision produit avant tout code (rien à faire seul dessus) :**
-- **Fusion de deux fiches partenaire** : que devient un abonnement/quota en double, un utilisateur lié aux deux fiches, un historique de factures divergent ? Pas implémenté, pas de règle définie.
-- **Documenter la feature Commissionnaire** dans `docs/commissionnaire.md` : aucun code n'existe pour cette feature, et le pricing/l'avance de fonds/le plafond budget/l'assurance-litiges ne sont pas décidés. Rédiger cette doc reviendrait à inventer des règles produit ; à faire une fois ces décisions prises.
+- **Fusion de deux fiches partenaire** — pas implémenté, mais règles validées le 2026-07-27, prêtes à coder (action admin unique "Fusionner deux fiches", réservée `super_admin`, transaction unique + log de l'action) :
+  - Abonnement en double : garder celui qui avantage le plus le partenaire (palier le plus élevé, sinon le plus de temps restant), pas automatiquement le plus ancien.
+  - Historique commandes/factures : jamais supprimé, toujours réattribué (`partner_id`) vers la fiche survivante ; la fiche fusionnée est archivée (statut "fusionnée" + pointeur vers la survivante), pas supprimée physiquement.
+  - Accès employé : transfert automatique vers la fiche survivante, pas de réinvitation manuelle — sauf conflit de rôle réel entre les deux fiches (rare), à trancher au cas par cas par un admin.
 - **E-mail portail obligatoire à l'étape forfait** (`app_krono/app/(auth)/business-onboarding.tsx:106`, actuellement `portalEmail.trim() || undefined`, jamais bloquant) : la tâche elle-même est conditionnelle ("si le produit l'exige") — décision à prendre : le rendre obligatoire ou non.
 
-### Grille B2B / monétisation cible
-
-- Décider : implémenter maintenant la grille commerciale **cible validée** de `docs/MONETISATION.md` (%+frais fixe FCFA, ex. Starter 8%+100 in-quota — différente de la grille technique actuelle 5%/3%/2%), ou stopgap simple d'abord. Touche backend, app client, admin, portail.
-- Persister gain livreur réel / marge Krono par commande (`driver_earning_cfa`, `krono_delivery_margin_cfa`, `b2b_fee_cfa`, `driver_payout_model`) — dépend de la décision grille ci-dessus (`docs/MONETISATION.md` section 7/10). Certains écrans confondent aujourd'hui prix de la course et gain livreur.
-
-### Roadmap produit (peu prioritaire, jalons futurs)
-
-**Phase 1bis / Phase 2 — Monétisation scale**
-- [ ] Paiement abonnement récurrent / automatisé (prestataires locaux : OM, Wave, MTN)
-- [ ] Renouvellement auto `partner_subscriptions` : `cancelled_at`, politique `ends_at` nullable
-
-**Phase 2 — ~6 mois après lancement**
-- [ ] Portail partenaire : Facturation + Équipe (côté partenaire self-service)
-- [ ] Table `partner_api_keys`
-- [ ] Endpoint `POST /api/partner/orders` (Axe 3)
-- [ ] Webhooks signés avec retries
-- [ ] WhatsApp bot pour création de commande rapide
-
-**Phase 3 — ~12 mois et au-delà**
-- [ ] Marque blanche (Axe 4)
-- [ ] Flotte dédiée Enterprise (Axe 5)
-- [ ] Publicité et analytics (Axe 6)
-- [ ] Séparation `partner_chrono` en app indépendante si nécessaire
+Roadmap produit post-lancement (peu prioritaire) : déplacée dans `docs/roadmap_produit.md`.
 
 ## Évaluation qualité — critères nécessitant le simulateur (nécessite mon feu vert)
 
@@ -92,12 +72,6 @@ venu plutôt qu'à réinventer :
 - Donc pour tester sans frais une fois prêt : lancer l'app contre un **backend local** (pas
   Render prod) avec un **numéro de test MTN/Moov** (pas Orange) → passe par le chemin SMS
   simulé, code recyclable directement depuis la réponse API/les logs, aucun envoi réel.
-
-## Bugs mineurs repérés (audit accessibilité 2026-07-23)
-
-- `app_krono/app/profile/support.tsx` **et** `driver_krono/app/profile/support.tsx` : items
-  FAQ en accordéon (chevron d'expansion) sans aucune action — fonctionnalité inachevée,
-  identique dans les 2 apps. Laissé de côté pour l'instant sur demande explicite.
 
 ## Tournées B2B (driver_krono)
 

@@ -5,8 +5,27 @@ import { router } from 'expo-router';
 import { driverMessageService } from '../../services/driverMessageService';
 import { useMessageStore } from '../../store/useMessageStore';
 
+const FAQ_ITEMS = [
+  {
+    question: 'Comment accepter une commande ?',
+    answer:
+      "Quand une nouvelle commande est disponible, une notification s'affiche avec le point de récupération, la distance et le gain estimé. Appuyez sur « Accepter » pour la prendre en charge avant qu'elle ne soit proposée à un autre livreur.",
+  },
+  {
+    question: 'Comment mettre à jour mon statut ?',
+    answer:
+      "Sur l'écran de la course en cours, utilisez les boutons d'étape (arrivé au point de collecte, colis récupéré, en livraison, livré) pour faire avancer le statut au fur et à mesure de votre progression.",
+  },
+  {
+    question: 'Comment recevoir mes paiements ?',
+    answer:
+      "Vos gains sont crédités sur votre solde commission après chaque course terminée. Consultez l'onglet Commissions pour voir le détail et l'historique de vos gains.",
+  },
+];
+
 export default function SupportPage() {
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const { setCurrentConversation } = useMessageStore();
 
   const handleContact = (method: string) => {
@@ -131,21 +150,29 @@ export default function SupportPage() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>FAQ</Text>
-          
-          <TouchableOpacity style={styles.faqItem}>
-            <Text style={styles.faqQuestion}>Comment accepter une commande ?</Text>
-            <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
 
-          <TouchableOpacity style={styles.faqItem}>
-            <Text style={styles.faqQuestion}>Comment mettre à jour mon statut ?</Text>
-            <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.faqItem}>
-            <Text style={styles.faqQuestion}>Comment recevoir mes paiements ?</Text>
-            <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
+          {FAQ_ITEMS.map((item, index) => {
+            const isOpen = openFaqIndex === index;
+            return (
+              <View key={item.question}>
+                <TouchableOpacity
+                  style={styles.faqItem}
+                  onPress={() => setOpenFaqIndex(isOpen ? null : index)}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.question}
+                  accessibilityState={{ expanded: isOpen }}
+                >
+                  <Text style={styles.faqQuestion}>{item.question}</Text>
+                  <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+                {isOpen && (
+                  <View style={styles.faqAnswerContainer}>
+                    <Text style={styles.faqAnswer}>{item.answer}</Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </View>
       </ScrollView>
     </View>
@@ -233,6 +260,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
     flex: 1,
+  },
+  faqAnswerContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  faqAnswer: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
   },
   supportChatItem: {
     backgroundColor: '#F3E8FF',

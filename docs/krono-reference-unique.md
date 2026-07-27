@@ -1044,7 +1044,8 @@ Fichiers vivants dans `docs/` :
 
 - `docs/krono-reference-unique.md` : **orientation uniquement** — contrat produit, règles durables, architecture, cartes de fichiers, décisions. Ne doit pas contenir de tâches à exécuter (voir règle en tête de ce document).
 - `docs/logique_livraison.md` : récapitulatif dédié de la logique de livraison — cycle de statuts, types de livraison, dispatch B2B, tournées, simulation du flux livreur, et refonte en cours de la livraison programmée. Contenu déplacé depuis ce fichier le 2026-07-26 pour centraliser le sujet.
-- `docs/taches.md` : tout ce qui reste à faire (backlog, migrations à appliquer, stabilisation App Store, roadmap B2B). Une tâche terminée est supprimée de ce fichier ; si elle change une règle durable, elle est résumée ici.
+- `docs/taches.md` : tout ce qui reste à faire (backlog, migrations à appliquer, stabilisation App Store). Une tâche terminée est supprimée de ce fichier ; si elle change une règle durable, elle est résumée ici.
+- `docs/roadmap_produit.md` : vision produit post-lancement (Phase 1bis/2/3 — monétisation scale, self-service portail, marque blanche, etc.), peu prioritaire, aucune de ces features en cours de construction.
 - `docs/integration_paiement_en_ligne.md` : reste à faire spécifique à l'intégration mobile money réelle.
 - `docs/MONETISATION.md` : grille commerciale cible (%+frais fixe FCFA) — voir section 16 pour la grille technique actuellement en vigueur.
 - `docs/supabase_tables_audit.md` : audit du schéma Supabase (tables, colonnes, usage réel).

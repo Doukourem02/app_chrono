@@ -5,8 +5,27 @@ import { router } from 'expo-router';
 import { userMessageService } from '../../services/userMessageService';
 import { useMessageStore } from '../../store/useMessageStore';
 
+const FAQ_ITEMS = [
+  {
+    question: 'Comment créer une commande ?',
+    answer:
+      "Depuis l'écran principal, appuyez sur « Nouvelle livraison », renseignez le point de récupération, le point de livraison et les détails du colis, puis validez pour lancer la recherche d'un livreur.",
+  },
+  {
+    question: 'Comment suivre ma livraison ?',
+    answer:
+      "Une fois un livreur assigné, sa position s'affiche en temps réel sur l'écran de suivi, avec le temps estimé avant la prise en charge puis avant la livraison.",
+  },
+  {
+    question: 'Comment payer ma commande ?',
+    answer:
+      "Le mode de paiement se choisit au moment de valider la commande, dans Profil > Moyens de paiement. Le paiement en espèces à la livraison est disponible dès maintenant.",
+  },
+];
+
 export default function SupportPage() {
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const { setCurrentConversation } = useMessageStore();
 
   const handleContact = (method: string) => {
@@ -131,33 +150,29 @@ export default function SupportPage() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>FAQ</Text>
-          
-          <TouchableOpacity
-            style={styles.faqItem}
-            accessibilityRole="button"
-            accessibilityLabel="Comment créer une commande ?"
-          >
-            <Text style={styles.faqQuestion}>Comment créer une commande ?</Text>
-            <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.faqItem}
-            accessibilityRole="button"
-            accessibilityLabel="Comment suivre ma livraison ?"
-          >
-            <Text style={styles.faqQuestion}>Comment suivre ma livraison ?</Text>
-            <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.faqItem}
-            accessibilityRole="button"
-            accessibilityLabel="Comment payer ma commande ?"
-          >
-            <Text style={styles.faqQuestion}>Comment payer ma commande ?</Text>
-            <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
+          {FAQ_ITEMS.map((item, index) => {
+            const isOpen = openFaqIndex === index;
+            return (
+              <View key={item.question}>
+                <TouchableOpacity
+                  style={styles.faqItem}
+                  onPress={() => setOpenFaqIndex(isOpen ? null : index)}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.question}
+                  accessibilityState={{ expanded: isOpen }}
+                >
+                  <Text style={styles.faqQuestion}>{item.question}</Text>
+                  <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+                {isOpen && (
+                  <View style={styles.faqAnswerContainer}>
+                    <Text style={styles.faqAnswer}>{item.answer}</Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </View>
       </ScrollView>
     </View>
@@ -245,6 +260,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
     flex: 1,
+  },
+  faqAnswerContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  faqAnswer: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
   },
   supportChatItem: {
     backgroundColor: '#F3E8FF',
