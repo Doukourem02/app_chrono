@@ -37,6 +37,24 @@ const NOMINATIM_HEADERS: HeadersInit = {
   'User-Agent': 'Krono/1.0 (app-mobile-address-search)',
 };
 
+/**
+ * Villes couvertes (lancement multi-ville Abidjan + Bouaké) — sert à lever l'ambiguïté des
+ * adresses "rue-like" dans les requêtes de géocodage, déduite de la position de référence
+ * (GPS utilisateur ou point de retrait), pas d'un attribut ville figé sur le profil.
+ * Abidjan reste le défaut si la position ne correspond à aucune zone connue.
+ */
+const CITY_BOUNDING_BOXES: { label: string; minLat: number; maxLat: number; minLng: number; maxLng: number }[] = [
+  { label: 'Bouaké', minLat: 7.3, maxLat: 8.1, minLng: -5.4, maxLng: -4.7 },
+];
+
+function guessCityLabel(coords: { latitude: number; longitude: number } | null): string {
+  if (!coords) return 'Abidjan';
+  const match = CITY_BOUNDING_BOXES.find(
+    (b) => coords.latitude >= b.minLat && coords.latitude <= b.maxLat && coords.longitude >= b.minLng && coords.longitude <= b.maxLng
+  );
+  return match?.label || 'Abidjan';
+}
+
 interface MapboxSuggestion {
   name: string;
   mapbox_id: string;
@@ -406,6 +424,8 @@ export default function MapboxAddressAutocomplete({
     return null;
   }, [proximityCoords, proximity]);
 
+  const cityHint = useMemo(() => guessCityLabel(refCoords), [refCoords]);
+
   useEffect(() => {
     if (isFocusedRef.current) return;
     setQuery(sanitizeGeocodeDisplayString(singleLineAddressInput(initialValue)));
@@ -480,7 +500,7 @@ export default function MapboxAddressAutocomplete({
       const streetLike = isStreetLikeQuery(trimmed);
       const streetTypes = extraTypes || 'street,address';
 
-      const curatedData = searchCuratedPoi(trimmed);
+      const curatedData = searchCuratedPoi(trimmed, cityHint);
       const fromCurated: MapboxSuggestion[] = curatedData.map((p, i) => ({
         name: p.name,
         mapbox_id: `curated-${p.name.toLowerCase().replace(/\s/g, '-')}-${i}`,
@@ -519,7 +539,12 @@ export default function MapboxAddressAutocomplete({
             })
           : Promise.resolve([] as OverpassPoiResult[]);
 
-        const nominatimQ = trimmed.toLowerCase().includes('abidjan') ? trimmed : `${trimmed}, Abidjan`;
+        const nominatimQ = trimmed.toLowerCase().includes(cityHint.toLowerCase()) ? trimmed : `${trimmed}, ${cityHint}`;
+        // Boîte souple (bounded=0 → simple préférence, pas un filtre dur) autour du point de proximité.
+        const viewbox =
+          Number.isFinite(proxLat) && Number.isFinite(proxLng)
+            ? `${proxLng - 0.15},${proxLat + 0.15},${proxLng + 0.15},${proxLat - 0.15}`
+            : undefined;
         const nominatimPromise = fetch(
           `${NOMINATIM_URL}?${new URLSearchParams({
             q: nominatimQ,
@@ -527,7 +552,7 @@ export default function MapboxAddressAutocomplete({
             limit: '8',
             countrycodes: 'ci',
             bounded: '0',
-            viewbox: '-4.15,5.2,-3.85,5.45',
+            ...(viewbox ? { viewbox } : {}),
           })}`,
           { headers: NOMINATIM_HEADERS },
         )
@@ -539,7 +564,7 @@ export default function MapboxAddressAutocomplete({
 
         const slowSourcesBundle = Promise.all([overpassPromise, nominatimPromise]);
 
-        const geocodeQ = streetLike ? `${trimmed}, Abidjan` : trimmed;
+        const geocodeQ = streetLike ? `${trimmed}, ${cityHint}` : trimmed;
         const fastFetches: Promise<Response>[] = [];
 
         if (!streetLike) {
@@ -574,7 +599,7 @@ export default function MapboxAddressAutocomplete({
           fastFetches.push(
             fetch(
               `${MAPBOX_GEOCODE_URL}?${new URLSearchParams({
-                q: `${trimmed}, Abidjan`,
+                q: `${trimmed}, ${cityHint}`,
                 access_token: accessToken,
                 ...baseParams,
                 limit: '6',
@@ -662,7 +687,7 @@ export default function MapboxAddressAutocomplete({
         if (gen !== suggestFetchGenRef.current) return;
       }
     },
-    [accessToken, sessionToken, country, proximity, savedAddresses],
+    [accessToken, sessionToken, country, proximity, savedAddresses, cityHint],
   );
 
   const handleInputChange = useCallback(

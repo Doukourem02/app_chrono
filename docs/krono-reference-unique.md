@@ -439,6 +439,8 @@ Migrations SQL : voir `krono_backend/migrations/README.md`. État d'application 
 - QR : scan obligatoire avant `completed` ou seulement preuve complémentaire.
 - Tracking public : durée exacte de validité des liens.
 - Fallback manuel livraison : preuve acceptée si QR impossible.
+- Multi-ville — détection de zone de service : un utilisateur dans une ville non couverte peut aujourd'hui passer commande sans avertissement (0 livreur disponible, panier silencieusement vide) ; reste à décider si/comment détecter la position et avertir clairement (voir section 18).
+- Multi-ville — tableaux de bord admin par ville : combien de livreurs/livraisons par localité ; la colonne `city` existe sur `users` mais n'est utilisée nulle part, à vérifier si la commune Mapbox déjà capturée dans le JSON d'adresse des commandes suffit avant de supposer une migration de schéma nécessaire (voir section 18).
 
 ---
 
@@ -1050,7 +1052,35 @@ Statut : lacunes documentées, aucune n'est corrigée à ce stade (hors du `.git
 
 ---
 
-## 18. Documents vivants
+## 18. Multi-ville — décision produit 2026-07-29
+
+**Décision** : lancer Krono simultanément sur Abidjan et Bouaké plutôt que consolider d'abord sur Abidjan seule (marché déjà occupé par Yango) avant d'étendre. Motivation business, pas technique.
+
+Abidjan et Bouaké sont **le point de départ, pas une limite figée** — l'architecture doit rester ouverte à d'autres villes sans refactoring. Concrètement, dans le code touché ici, `City` (backend `approximatePickupZones.ts` et frontend `admin_krono/lib/approximatePickupZones.ts`) est une chaîne libre (`type City = string`), pas une énumération à 2 valeurs — ajouter une ville se fait en ajoutant ses entrées dans ces fichiers de données, le `<select>` groupé (`NewShippingModal.tsx`) et `APPROXIMATE_PICKUP_CITIES` s'adaptent automatiquement, sans toucher au typage ni au code appelant. Même logique pour `CITY_BOUNDING_BOXES` dans `MapboxAddressAutocomplete.tsx` (app mobile) : un tableau extensible, pas une paire figée.
+
+### Principe d'architecture retenu
+
+Pas d'attribut « ville » figé sur le profil utilisateur. Le scoping se fait dynamiquement à partir de la position GPS réelle au moment de l'usage (utilisateur en déplacement = expérience qui suit sa position, pas son « profil »). C'est délibérément cohérent avec ce que fait déjà le matching livreur (rayon autour du point de retrait réel, pas une notion de ville).
+
+### Déjà city-agnostic nativement (vérifié dans le code, aucun changement nécessaire)
+
+- **Matching livreur** (`findNearbyDrivers`, `orderSocketMatching.ts`) : rayon GPS (défaut 10 km) autour du point de retrait réel. Un client à Bouaké ne peut physiquement pas matcher avec un livreur d'Abidjan (~350 km).
+- **Tarification dynamique** (météo `openMeteoPricing.ts`, trafic) : basée sur les coordonnées réelles de la commande, pas un point fixe.
+- Le multiplicateur horaire `getHourMultiplierAbidjan` (`dynamicPricing.ts`) est mal nommé mais généraliste (heure locale CI, UTC+0) — s'applique correctement partout dans le pays malgré son nom.
+
+### Corrigé le 2026-07-29 (biais géographique Abidjan en dur)
+
+- **Autocomplétion d'adresse** (`admin_krono/components/AddressAutocomplete.tsx` et `app_krono/components/MapboxAddressAutocomplete.tsx`) : les requêtes de géocodage pour une adresse « rue-like » ajoutaient inconditionnellement le suffixe `, Abidjan` au texte recherché — un client à Bouaké tapant son adresse voyait Mapbox chercher sa rue à Abidjan. Devenu paramétrable (`cityHint` déduit de la position réelle côté mobile via une bounding box Bouaké, prop explicite côté admin) ; la ville reste « Abidjan » par défaut si aucune position n'est connue.
+- Points d'entrée mobile qui ne transmettaient pas la position réelle (`add-address.tsx`, point de collecte `BatchShippingBottomSheet.tsx`) : branchés sur `useLocationStore` pour hériter du même comportement que le flux de livraison principal (`DeliveryBottomSheet.tsx`, déjà correct).
+- **Zones de retrait approximatives** pour les commandes téléphone/hors-ligne créées par l'admin (`krono_backend/src/utils/approximatePickupZones.ts`, ex-`abidjanApproximatePickupZones.ts`) : généralisées à plusieurs villes, communes de Bouaké ajoutées (coordonnées de bonne foi, non vérifiées sur le terrain contrairement à la liste Abidjan — à confirmer avant lancement réel). Dropdown de sélection (`NewShippingModal.tsx`) groupé par ville via `<optgroup>`.
+- **POI curatés** (`poiAbidjan.ts`) : cas concret trouvé le 2026-07-29 — le cinéma « Pathé Cap Sud » (Abidjan) était suggéré à quiconque tapait « Pathé », y compris un client à Bouaké, comme s'il était à proximité. Chaque entrée est maintenant taguée par ville et `searchCuratedPoi` filtre par `cityHint` (même mécanisme que l'autocomplétion). Reste peu de contenu (1 seule entrée) — pas d'équivalent Bouaké pour l'instant, juste plus de faux positif inter-villes.
+- **Fallbacks d'affichage carte** (`DeliveryMapView.tsx`, `order-tracking/[orderId].tsx`) : centrent la carte sur Abidjan par défaut, mais uniquement en dernier recours (avant que le GPS réel ou les coordonnées de la commande soient disponibles) — n'affecte aucune donnée réellement affichée, juste le pixel de départ le temps que la vraie position arrive. Laissé tel quel, à changer seulement si perçu comme un problème UX réel.
+
+Décisions encore ouvertes sur ce chantier : voir section 14 (« Détection de zone de service » et « Tableaux de bord admin par ville »).
+
+---
+
+## 19. Documents vivants
 
 Fichiers vivants dans `docs/` :
 

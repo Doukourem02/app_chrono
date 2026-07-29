@@ -1,6 +1,12 @@
 /**
- * POI curatés Abidjan - restaurants, cinémas, etc.
+ * POI curatés - restaurants, cinémas, etc., par ville.
  * Complète Mapbox/Overpass pour afficher toutes les succursales (style Yango)
+ *
+ * Chaque groupe est tagué par ville : searchCuratedPoi ne renvoie que les POI de la ville
+ * déduite de la position réelle de l'utilisateur (cityHint), pour ne jamais suggérer un lieu
+ * d'une autre ville comme s'il était à proximité (ex: cinéma d'Abidjan proposé à un client à
+ * Bouaké). Sans cityHint, tout est renvoyé (comportement historique, utilisé nulle part sans
+ * position connue en pratique).
  */
 export interface CuratedPoi {
   name: string
@@ -12,9 +18,10 @@ export interface CuratedPoi {
   category: 'restaurant' | 'cinema' | 'pharmacy' | 'other'
 }
 
-/** Mots-clés de recherche → POI correspondants */
-const POI_ENTRIES: { keywords: string[]; pois: CuratedPoi[] }[] = [
+/** Mots-clés de recherche → POI correspondants, groupés par ville */
+const POI_ENTRIES: { city: string; keywords: string[]; pois: CuratedPoi[] }[] = [
   {
+    city: 'Abidjan',
     keywords: ['pathe', 'pathé', 'pathé cinema', 'pathe cinema', 'cap sud'],
     pois: [
       {
@@ -31,14 +38,15 @@ const POI_ENTRIES: { keywords: string[]; pois: CuratedPoi[] }[] = [
 
 /**
  * Recherche dans les POI curatés.
- * Retourne les POI dont les keywords matchent la requête.
+ * Retourne les POI dont les keywords matchent la requête, filtrés par ville si cityHint fourni.
  */
-export function searchCuratedPoi(query: string): CuratedPoi[] {
+export function searchCuratedPoi(query: string, cityHint?: string): CuratedPoi[] {
   const q = query.trim().toLowerCase().replace(/'/g, '')
   if (q.length < 2) return []
 
   const results: CuratedPoi[] = []
   for (const entry of POI_ENTRIES) {
+    if (cityHint && entry.city !== cityHint) continue
     const matches = entry.keywords.some((kw) => q.includes(kw.toLowerCase().replace(/'/g, '')))
     if (matches) {
       results.push(...entry.pois)

@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import { logger } from '@/utils/logger'
 import { getPhoneValidationError } from '@/utils/phoneValidation'
-import { ABIDJAN_APPROXIMATE_PICKUP_ZONE_OPTIONS } from '@/lib/abidjanApproximatePickupZones'
+import { APPROXIMATE_PICKUP_ZONE_OPTIONS, APPROXIMATE_PICKUP_CITIES } from '@/lib/approximatePickupZones'
 import { useLanguageStore } from '@/stores/languageStore'
 import { useTranslation } from '@/hooks/useTranslation'
 
@@ -969,10 +969,14 @@ export default function NewShippingModal({
                           required
                         >
                           <option value="">{t('newShipping.zonePlaceholder')}</option>
-                          {ABIDJAN_APPROXIMATE_PICKUP_ZONE_OPTIONS.map((z) => (
-                            <option key={z.value} value={z.value}>
-                              {z.label}
-                            </option>
+                          {APPROXIMATE_PICKUP_CITIES.map((city) => (
+                            <optgroup key={city} label={city}>
+                              {APPROXIMATE_PICKUP_ZONE_OPTIONS.filter((z) => z.city === city).map((z) => (
+                                <option key={z.value} value={z.value}>
+                                  {z.label}
+                                </option>
+                              ))}
+                            </optgroup>
                           ))}
                         </select>
                       </div>

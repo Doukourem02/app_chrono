@@ -170,6 +170,10 @@ interface AddressAutocompleteProps {
   onChange: (address: string, coordinates?: { latitude: number; longitude: number }) => void
   placeholder?: string
   label?: React.ReactNode
+  /** "lng,lat" utilisé pour biaiser/limiter la recherche — défaut Abidjan pour compat descendante. */
+  proximity?: string
+  /** Ville ajoutée aux requêtes "rue-like" pour lever l'ambiguïté (ex: "Rue 12" existe dans plusieurs villes). */
+  cityHint?: string
 }
 
 export default function AddressAutocomplete({
@@ -177,6 +181,8 @@ export default function AddressAutocomplete({
   onChange,
   placeholder = 'Ex: Cocody, Abidjan',
   label,
+  proximity = PROXIMITY,
+  cityHint = 'Abidjan',
 }: AddressAutocompleteProps) {
   const [query, setQuery] = useState(value)
   const [suggestions, setSuggestions] = useState<MapboxSuggestion[]>([])
@@ -270,14 +276,14 @@ export default function AddressAutocomplete({
 
       setIsLoading(true)
       try {
-        const baseParams = { country: 'ci', language: 'fr', proximity: PROXIMITY }
+        const baseParams = { country: 'ci', language: 'fr', proximity }
         const extraTypes = isNumericQuery(trimmed) ? 'postcode,address' : undefined
         const streetLike = isStreetLikeQuery(trimmed)
         const streetTypes = extraTypes || 'street,address'
 
-        const geocodeQ = streetLike ? `${trimmed}, Abidjan` : trimmed
+        const geocodeQ = streetLike ? `${trimmed}, ${cityHint}` : trimmed
 
-        const [proxLng, proxLat] = PROXIMITY.split(',').map((x) => parseFloat(x.trim()))
+        const [proxLng, proxLat] = proximity.split(',').map((x) => parseFloat(x.trim()))
         const overpassPromise = !streetLike
           ? searchOverpassPoi(
               trimmed,
@@ -285,7 +291,12 @@ export default function AddressAutocomplete({
             ).catch(() => [] as OverpassPoiResult[])
           : Promise.resolve([] as OverpassPoiResult[])
 
-        const nominatimQ = trimmed.toLowerCase().includes('abidjan') ? trimmed : `${trimmed}, Abidjan`
+        const nominatimQ = trimmed.toLowerCase().includes(cityHint.toLowerCase()) ? trimmed : `${trimmed}, ${cityHint}`
+        // Boîte souple (bounded=0 → simple préférence, pas un filtre dur) autour du point de proximité.
+        const viewbox =
+          Number.isFinite(proxLat) && Number.isFinite(proxLng)
+            ? `${proxLng - 0.15},${proxLat + 0.15},${proxLng + 0.15},${proxLat - 0.15}`
+            : undefined
         const nominatimPromise = fetch(
           `${NOMINATIM_URL}?${new URLSearchParams({
             q: nominatimQ,
@@ -293,7 +304,7 @@ export default function AddressAutocomplete({
             limit: '10',
             countrycodes: 'ci',
             bounded: '0',
-            viewbox: '-4.15,5.2,-3.85,5.45',
+            ...(viewbox ? { viewbox } : {}),
           })}`,
           { headers: NOMINATIM_HEADERS }
         )
@@ -327,7 +338,7 @@ export default function AddressAutocomplete({
         const geocodeStreetFetch = !streetLike
           ? fetch(
               `${MAPBOX_GEOCODE_URL}?${new URLSearchParams({
-                q: `${trimmed}, Abidjan`,
+                q: `${trimmed}, ${cityHint}`,
                 access_token: accessToken,
                 ...baseParams,
                 limit: '6',
@@ -381,7 +392,7 @@ export default function AddressAutocomplete({
           source: 'overpass',
         }))
 
-        const curatedData = searchCuratedPoi(trimmed)
+        const curatedData = searchCuratedPoi(trimmed, cityHint)
         const fromCurated: MapboxSuggestion[] = curatedData.map((p, i) => ({
           name: p.name,
           mapbox_id: `curated-${p.name.toLowerCase().replace(/\s/g, '-')}-${i}`,
@@ -421,7 +432,7 @@ export default function AddressAutocomplete({
         setIsLoading(false)
       }
     },
-    [accessToken, sessionToken, parseGeocodeFeature]
+    [accessToken, sessionToken, parseGeocodeFeature, proximity, cityHint]
   )
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -4,6 +4,7 @@ import React, { useCallback, useState } from 'react';
 import {Alert,KeyboardAvoidingView,Platform,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapboxAddressAutocomplete from '../../components/MapboxAddressAutocomplete';
+import { useLocationStore } from '../../store/useLocationStore';
 import { useSavedAddressesStore } from '../../store/useSavedAddressesStore';
 import { sanitizeGeocodeDisplayString, singleLineAddressInput } from '../../utils/sanitizeGeocodeDisplay';
 
@@ -15,6 +16,7 @@ const PRESETS = [
 export default function AddAddressPage() {
   const insets = useSafeAreaInsets();
   const addAddress = useSavedAddressesStore((s) => s.addAddress);
+  const currentLocation = useLocationStore((s) => s.currentLocation);
   const [addressLine, setAddressLine] = useState('');
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [label, setLabel] = useState('');
@@ -112,6 +114,11 @@ export default function AddAddressPage() {
               placeholder="Rechercher une adresse"
               country="ci"
               initialValue=""
+              proximityCoords={
+                currentLocation
+                  ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude }
+                  : undefined
+              }
               onPlaceSelected={onPlaceSelected}
             />
           </View>

@@ -10,7 +10,7 @@ import { activeOrders, connectedUsers, notifyDriversForOrder } from '../sockets/
 import { formatDeliveryId } from '../utils/formatDeliveryId.js';
 import { geocodeAddress } from '../utils/geocodeService.js';
 import logger from '../utils/logger.js';
-import { resolveApproximatePickupZone } from '../utils/abidjanApproximatePickupZones.js';
+import { resolveApproximatePickupZone } from '../utils/approximatePickupZones.js';
 import { formatEtaMinutes, realisticEtaMinutesFromRoute } from '../utils/ivoryCoastEta.js';
 import { computeDynamicDeliveryPrice } from '../services/dynamicPricing.js';
 import { haversineDistanceKm } from '../services/priceCalculator.js';

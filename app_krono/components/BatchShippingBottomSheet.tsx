@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/useAuthStore';
 import { useBusinessStore } from '../store/useBusinessStore';
+import { useLocationStore } from '../store/useLocationStore';
 import { createBatch, getPartnerDrivers, type PartnerDriver } from '../services/partnerApi';
 import MapboxAddressAutocomplete from './MapboxAddressAutocomplete';
 import { locationService } from '../services/locationService';
@@ -25,6 +26,7 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
   const { user } = useAuthStore();
   const { batchPickupAddress, batchPickupCoords, batchRecipients, batchDriverId, batchOptimizedOrder,
     setBatchPickup, addRecipient, removeRecipient, setBatchDriver, setOptimizedOrder, resetBatch } = useBusinessStore();
+  const currentLocation = useLocationStore((s) => s.currentLocation);
 
   const [step, setStep] = useState<Step>('recipients');
   const [drivers, setDrivers] = useState<PartnerDriver[]>([]);
@@ -200,6 +202,7 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
                       placeholder="Point de collecte commun"
                       initialValue={batchPickupAddress}
                       embedded
+                      proximityCoords={currentLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : null}
                       onQueryChange={(text) => setBatchPickup(text, undefined)}
                       onPlaceSelected={(data) => {
                         const addr = data.routingAddress ?? data.description;
