@@ -6,6 +6,7 @@ Flux gardes actifs cote portail :
 
 - `Invite user` : invitation controlee par l'admin ou le owner partenaire.
 - `Magic link` : connexion sans mot de passe pour les utilisateurs deja invites.
+- `Confirm signup` : confirmation d'adresse email a l'inscription.
 
 Le login magic link doit rester configure avec `shouldCreateUser: false` cote client pour eviter l'inscription libre.
 

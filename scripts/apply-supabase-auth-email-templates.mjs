@@ -76,12 +76,18 @@ async function main() {
     path.join(rootDir, 'supabase/auth-email-templates/magic-link.html'),
     'utf8'
   );
+  const confirmSignupTemplate = await readFile(
+    path.join(rootDir, 'supabase/auth-email-templates/confirm-signup.html'),
+    'utf8'
+  );
 
   const payload = {
     mailer_subjects_invite: 'Krono - Invitation au portail partenaire',
     mailer_templates_invite_content: inviteTemplate,
     mailer_subjects_magic_link: 'Krono - Connexion au portail partenaire',
     mailer_templates_magic_link_content: magicLinkTemplate,
+    mailer_subjects_confirmation: 'Krono - Confirmez votre inscription',
+    mailer_templates_confirmation_content: confirmSignupTemplate,
   };
 
   const apiBase = process.env.SUPABASE_MANAGEMENT_API_URL || 'https://api.supabase.com';
@@ -118,6 +124,8 @@ async function main() {
     authConfig.mailer_templates_invite_content === payload.mailer_templates_invite_content,
     authConfig.mailer_subjects_magic_link === payload.mailer_subjects_magic_link,
     authConfig.mailer_templates_magic_link_content === payload.mailer_templates_magic_link_content,
+    authConfig.mailer_subjects_confirmation === payload.mailer_subjects_confirmation,
+    authConfig.mailer_templates_confirmation_content === payload.mailer_templates_confirmation_content,
   ];
 
   if (checks.some((ok) => !ok)) {
