@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Search, User, Truck, Shield, Eye, UserPlus } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import { ScreenTransition } from '@/components/animations'
@@ -28,10 +28,12 @@ const VISIBLE_USER_ROLES = new Set(['client', 'driver', 'admin', 'super_admin'])
 
 export default function UsersPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const t = useTranslation()
   const { isSuperAdmin } = useAuthStore()
   const [currentPage, setCurrentPage] = useState(1)
-  const [searchQuery, setSearchQuery] = useState('')
+  // Pré-rempli depuis "Voir tous les résultats" dans la recherche globale du Header
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '')
   const [roleFilter, setRoleFilter] = useState<string>('all')
   const [showInviteModal, setShowInviteModal] = useState(false)
   const itemsPerPage = 10

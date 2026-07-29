@@ -116,7 +116,12 @@
       "online": "En ligne",
       "offline": "Hors ligne",
       "deliveries": "livraisons",
-      "registeredOn": "Inscrit le"
+      "registeredOn": "Inscrit le",
+      "recentSearches": "Recherches récentes",
+      "clearRecent": "Effacer",
+      "viewAll": "Voir tous les résultats",
+      "approximateMatch": "Correspondance approximative",
+      "refineSearch": "Affinez votre recherche pour plus de résultats"
     }
   },
   "partnersPage": {

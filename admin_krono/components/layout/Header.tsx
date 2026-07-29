@@ -1,7 +1,7 @@
 'use client'
 
-import { Search, Bell, SlidersHorizontal, X, Package, User, ChevronDown, CheckCheck } from 'lucide-react'
-import { useState, useEffect, useRef, Fragment } from 'react'
+import { Search, Bell, SlidersHorizontal, X, Package, User, ChevronDown, CheckCheck, Clock, ArrowRight } from 'lucide-react'
+import { useState, useEffect, useRef, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
@@ -58,6 +58,49 @@ interface SearchClient {
   createdAt: string
 }
 
+type FlatResultEntry =
+  | { type: 'orders'; item: SearchOrder }
+  | { type: 'drivers'; item: SearchDriver }
+  | { type: 'clients'; item: SearchClient }
+
+const RECENT_SEARCHES_KEY = 'krono_admin_recent_searches'
+const MAX_RECENT_SEARCHES = 5
+
+// Surligne la première occurrence (insensible à la casse) de `query` dans `text`.
+// Retourne le texte tel quel si rien à surligner (requête trop courte ou pas de correspondance
+// littérale — ex. un résultat remonté uniquement par tolérance aux fautes de frappe/accents).
+function highlightMatch(text: string | null | undefined, query: string): React.ReactNode {
+  if (!text) return text
+  const q = query.trim()
+  if (q.length < 2) return text
+  const idx = text.toLowerCase().indexOf(q.toLowerCase())
+  if (idx === -1) return text
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark
+        style={{
+          backgroundColor: `${themeColors.purplePrimary}40`,
+          color: 'inherit',
+          borderRadius: '2px',
+          padding: '0 1px',
+        }}
+      >
+        {text.slice(idx, idx + q.length)}
+      </mark>
+      {text.slice(idx + q.length)}
+    </>
+  )
+}
+
+// Un résultat est "approximatif" si aucun de ses champs affichés ne contient littéralement la
+// requête — il n'est remonté que grâce au fuzzy matching (typo/accent) côté backend.
+function isApproximateMatch(fields: Array<string | null | undefined>, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (q.length < 2) return false
+  return !fields.some((f) => f?.toLowerCase().includes(q))
+}
+
 export default function Header() {
   const router = useRouter()
   const { dateFilter, setDateFilter } = useDateFilter()
@@ -68,14 +111,62 @@ export default function Header() {
   const [showFilters, setShowFilters] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [recentSearches, setRecentSearches] = useState<string[]>([])
+  const [activeIndex, setActiveIndex] = useState(-1)
   const searchRef = useRef<HTMLDivElement>(null)
   const filtersRef = useRef<HTMLDivElement>(null)
   const datePickerRef = useRef<HTMLDivElement>(null)
   const notificationsRef = useRef<HTMLDivElement>(null)
+  const resultItemRefs = useRef<Map<number, HTMLDivElement>>(new Map())
 
   // Notifications
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotificationStore()
   useNotifications() // Active l'écoute des événements Socket.IO
+
+  // Recherches récentes (localStorage) — affichées au focus quand le champ est vide
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RECENT_SEARCHES_KEY)
+      if (raw) setRecentSearches(JSON.parse(raw))
+    } catch (e) {
+      logger.debug('[Header] Lecture recherches récentes impossible:', e)
+    }
+  }, [])
+
+  const addRecentSearch = (term: string) => {
+    const trimmed = term.trim()
+    if (trimmed.length < 3) return
+    setRecentSearches((prev) => {
+      const next = [trimmed, ...prev.filter((s) => s.toLowerCase() !== trimmed.toLowerCase())].slice(0, MAX_RECENT_SEARCHES)
+      try {
+        localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next))
+      } catch (e) {
+        logger.debug('[Header] Écriture recherches récentes impossible:', e)
+      }
+      return next
+    })
+  }
+
+  const removeRecentSearch = (term: string) => {
+    setRecentSearches((prev) => {
+      const next = prev.filter((s) => s !== term)
+      try {
+        localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next))
+      } catch (e) {
+        logger.debug('[Header] Écriture recherches récentes impossible:', e)
+      }
+      return next
+    })
+  }
+
+  const clearRecentSearches = () => {
+    setRecentSearches([])
+    try {
+      localStorage.removeItem(RECENT_SEARCHES_KEY)
+    } catch (e) {
+      logger.debug('[Header] Suppression recherches récentes impossible:', e)
+    }
+  }
 
   // Debounce pour éviter trop de requêtes
   useEffect(() => {
@@ -86,9 +177,17 @@ export default function Header() {
     return () => clearTimeout(timer)
   }, [query])
 
+  // Réinitialiser la sélection clavier à chaque nouvelle frappe
+  useEffect(() => {
+    setActiveIndex(-1)
+  }, [debouncedQuery])
+
   const { data: searchResults, isLoading: isSearching } = useQuery({
     queryKey: ['global-search', debouncedQuery],
-    queryFn: () => adminApiService.globalSearch(debouncedQuery),
+    // Le signal est transmis à fetch() : quand la clé de requête change (nouvelle frappe) avant
+    // que la précédente n'ait répondu, react-query annule automatiquement l'appel en vol —
+    // évite de gaspiller de la charge backend et un éventuel flash de résultats obsolètes.
+    queryFn: ({ signal }) => adminApiService.globalSearch(debouncedQuery, signal),
     enabled: debouncedQuery.trim().length > 2,
     staleTime: 30000, // Cache pendant 30 secondes
     refetchOnWindowFocus: false,
@@ -110,6 +209,163 @@ export default function Header() {
       })
     }
   }, [searchResults, debouncedQuery])
+
+  // Catégories triées par pertinence (même logique de scoring qu'avant, extraite dans un
+  // useMemo pour être partagée entre le rendu et la navigation clavier — flatResults ci-dessous
+  // doit énumérer les résultats exactement dans l'ordre où ils sont affichés).
+  const orderedCategories = useMemo(() => {
+    if (!searchResults?.data) return []
+
+    const hasOrders = searchResults.data.orders.length > 0
+    const hasDrivers = searchResults.data.drivers.length > 0
+    const hasClients = searchResults.data.clients.length > 0
+    if (!hasOrders && !hasDrivers && !hasClients) return []
+
+    const normalizedQuery = debouncedQuery.toLowerCase().trim()
+
+    const getInitials = (fullName: string): string => {
+      if (!fullName) return ''
+      return fullName
+        .split(/\s+/)
+        .map((word) => word.charAt(0))
+        .join('')
+        .toLowerCase()
+    }
+
+    const getNameWords = (fullName: string): string[] => {
+      if (!fullName) return []
+      return fullName
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((word) => word.length > 0)
+    }
+
+    const isOrderId = normalizedQuery.startsWith('chlv') || normalizedQuery.match(/^[a-z]{4}-\d{6}-[a-z0-9]{4}$/i)
+    const looksLikeName = !isOrderId && /^[a-z\s]+$/.test(normalizedQuery) && normalizedQuery.length >= 2
+
+    let ordersScore = 0
+    if (hasOrders) {
+      if (isOrderId) {
+        ordersScore = 100
+      } else if (looksLikeName) {
+        const nameMatches = (searchResults.data.orders as SearchOrder[]).filter((order) => {
+          const clientName = order.clientName?.toLowerCase() || ''
+          const driverName = order.driverName?.toLowerCase() || ''
+          return clientName.includes(normalizedQuery) || driverName.includes(normalizedQuery)
+        }).length
+        ordersScore = nameMatches * 1
+      } else {
+        const exactMatches = (searchResults.data.orders as SearchOrder[]).filter(
+          (order) =>
+            order.deliveryId?.toLowerCase().includes(normalizedQuery) ||
+            order.clientName?.toLowerCase().includes(normalizedQuery) ||
+            order.driverName?.toLowerCase().includes(normalizedQuery)
+        ).length
+        ordersScore = exactMatches * 10 + searchResults.data.orders.length
+      }
+    }
+
+    let driversScore = 0
+    if (hasDrivers && looksLikeName) {
+      const drivers = searchResults.data.drivers as SearchDriver[]
+      const queryWords = normalizedQuery.split(/\s+/).filter((w) => w.length > 0)
+
+      let directNameMatches = 0
+      let partialMatches = 0
+      let initialsMatches = 0
+
+      drivers.forEach((driver) => {
+        const fullName = driver.fullName?.toLowerCase() || ''
+        if (!fullName) return
+
+        const nameWords = getNameWords(fullName)
+        const initials = getInitials(fullName)
+
+        if (fullName.includes(normalizedQuery)) {
+          directNameMatches++
+        } else if (initials.startsWith(normalizedQuery) || normalizedQuery.startsWith(initials)) {
+          initialsMatches++
+        } else if (queryWords.some((qw) => nameWords.some((nw) => nw.includes(qw) || qw.includes(nw)))) {
+          partialMatches++
+        }
+      })
+
+      driversScore = directNameMatches * 100 + initialsMatches * 50 + partialMatches * 25
+    } else if (hasDrivers) {
+      const exactMatches = (searchResults.data.drivers as SearchDriver[]).filter((driver) => {
+        const fullName = driver.fullName?.toLowerCase() || ''
+        const phone = driver.phone?.toLowerCase() || ''
+        return fullName.includes(normalizedQuery) || phone.includes(normalizedQuery)
+      }).length
+      driversScore = exactMatches * 10 + searchResults.data.drivers.length
+    }
+
+    let clientsScore = 0
+    if (hasClients && looksLikeName) {
+      const clients = searchResults.data.clients as SearchClient[]
+      const queryWords = normalizedQuery.split(/\s+/).filter((w) => w.length > 0)
+
+      let directNameMatches = 0
+      let partialMatches = 0
+      let initialsMatches = 0
+
+      clients.forEach((client) => {
+        const fullName = client.fullName?.toLowerCase() || ''
+        if (!fullName) return
+
+        const nameWords = getNameWords(fullName)
+        const initials = getInitials(fullName)
+
+        if (fullName.includes(normalizedQuery)) {
+          directNameMatches++
+        } else if (initials.startsWith(normalizedQuery) || normalizedQuery.startsWith(initials)) {
+          initialsMatches++
+        } else if (queryWords.some((qw) => nameWords.some((nw) => nw.includes(qw) || qw.includes(nw)))) {
+          partialMatches++
+        }
+      })
+
+      clientsScore = directNameMatches * 100 + initialsMatches * 50 + partialMatches * 25
+    } else if (hasClients) {
+      const exactMatches = (searchResults.data.clients as SearchClient[]).filter((client) => {
+        const fullName = client.fullName?.toLowerCase() || ''
+        const phone = client.phone?.toLowerCase() || ''
+        return fullName.includes(normalizedQuery) || phone.includes(normalizedQuery)
+      }).length
+      clientsScore = exactMatches * 10 + searchResults.data.clients.length
+    }
+
+    const categories: Array<
+      | { type: 'orders'; score: number; items: SearchOrder[] }
+      | { type: 'drivers'; score: number; items: SearchDriver[] }
+      | { type: 'clients'; score: number; items: SearchClient[] }
+    > = [
+      { type: 'orders', score: ordersScore, items: searchResults.data.orders as SearchOrder[] },
+      { type: 'drivers', score: driversScore, items: searchResults.data.drivers as SearchDriver[] },
+      { type: 'clients', score: clientsScore, items: searchResults.data.clients as SearchClient[] },
+    ]
+
+    return categories
+      .filter((c) => c.items.length > 0)
+      .sort((a, b) => (a.score !== b.score ? b.score - a.score : a.type.localeCompare(b.type)))
+  }, [searchResults, debouncedQuery])
+
+  // Liste à plat, dans le même ordre que le rendu — sert à la navigation clavier (flèches/Enter).
+  const flatResults = useMemo<FlatResultEntry[]>(() => {
+    const flat: FlatResultEntry[] = []
+    orderedCategories.forEach((category) => {
+      if (category.type === 'orders') category.items.forEach((item) => flat.push({ type: 'orders', item }))
+      else if (category.type === 'drivers') category.items.forEach((item) => flat.push({ type: 'drivers', item }))
+      else category.items.forEach((item) => flat.push({ type: 'clients', item }))
+    })
+    return flat
+  }, [orderedCategories])
+
+  // Fait défiler l'élément sélectionné au clavier dans la vue si besoin
+  useEffect(() => {
+    if (activeIndex < 0) return
+    resultItemRefs.current.get(activeIndex)?.scrollIntoView({ block: 'nearest' })
+  }, [activeIndex])
 
   // Fermer les menus quand on clique en dehors
   useEffect(() => {
@@ -137,6 +393,8 @@ export default function Header() {
   }, [])
 
   const handleSearchResultClick = (type: 'order' | 'driver' | 'client', id?: string, orderStatus?: string) => {
+    if (debouncedQuery.trim().length >= 3) addRecentSearch(debouncedQuery)
+
     if (type === 'order' && id) {
       // Mapper le statut de la commande vers le paramètre d'URL
       const statusToUrlMap: Record<string, string> = {
@@ -167,6 +425,32 @@ export default function Header() {
     }
     setShowSearchResults(false)
     setQuery('')
+  }
+
+  const activateEntry = (entry: FlatResultEntry) => {
+    if (entry.type === 'orders') handleSearchResultClick('order', entry.item.id, entry.item.status)
+    else if (entry.type === 'drivers') handleSearchResultClick('driver', entry.item.id)
+    else handleSearchResultClick('client', entry.item.id)
+  }
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      setShowSearchResults(false)
+      return
+    }
+    if (!showSearchResults || flatResults.length === 0) return
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActiveIndex((i) => Math.min(i + 1, flatResults.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActiveIndex((i) => Math.max(i - 1, 0))
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault()
+      const entry = flatResults[activeIndex]
+      if (entry) activateEntry(entry)
+    }
   }
 
   const getStatusColor = (status: string) => {
@@ -271,6 +555,24 @@ export default function Header() {
     alignItems: 'flex-start',
     gap: '12px',
     transition: 'background-color 0.2s',
+  }
+
+  const viewAllLinkStyle: React.CSSProperties = {
+    padding: '10px 16px',
+    fontSize: '12px',
+    fontWeight: 600,
+    color: themeColors.purplePrimary,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
+  }
+
+  const approximateBadgeStyle: React.CSSProperties = {
+    fontSize: '10px',
+    color: themeColors.textTertiary,
+    fontStyle: 'italic',
   }
 
   const buttonsContainerStyle: React.CSSProperties = {
@@ -413,6 +715,11 @@ export default function Header() {
     color: '#FFFFFF',
   }
 
+  const showRecentSearches = query.trim().length === 0 && recentSearches.length > 0
+  const showResultsDropdown = showSearchResults && (query.length > 2 || debouncedQuery.length > 2 || showRecentSearches)
+
+  let flatIndex = -1
+
   return (
     <div style={headerStyle}>
       <div style={searchContainerStyle} ref={searchRef}>
@@ -421,15 +728,26 @@ export default function Header() {
           type="text"
           value={query}
           onChange={(e) => {
-            setQuery(e.target.value)
-            setShowSearchResults(e.target.value.length > 2)
+            const value = e.target.value
+            setQuery(value)
+            if (value.length > 2) setShowSearchResults(true)
+            else if (value.length === 0 && recentSearches.length > 0) setShowSearchResults(true)
+            else setShowSearchResults(false)
           }}
+          onKeyDown={handleSearchKeyDown}
           placeholder={t('header.searchPlaceholder')}
           style={inputStyle}
+          role="combobox"
+          aria-expanded={showResultsDropdown}
+          aria-controls="header-search-listbox"
+          aria-autocomplete="list"
+          aria-activedescendant={activeIndex >= 0 ? `header-search-option-${activeIndex}` : undefined}
           onFocus={(e) => {
             e.target.style.boxShadow = '0 0 0 2px rgba(139, 92, 246, 0.2)'
             e.target.style.backgroundColor = themeColors.cardBg
-            if (debouncedQuery.length > 2 || query.length > 2) {
+            if (query.trim().length === 0 && recentSearches.length > 0) {
+              setShowSearchResults(true)
+            } else if (debouncedQuery.length > 2 || query.length > 2) {
               setShowSearchResults(true)
             }
           }}
@@ -468,392 +786,441 @@ export default function Header() {
             <X size={16} style={{ color: themeColors.textSecondary }} />
           </button>
         )}
-        {showSearchResults && (query.length > 2 || debouncedQuery.length > 2) && (
-          <div style={searchResultsStyle}>
-            {isSearching ? (
+        {showResultsDropdown && (
+          <div id="header-search-listbox" style={searchResultsStyle} role="listbox">
+            {showRecentSearches ? (
+              <div style={{ padding: '4px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '8px 12px 4px',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: themeColors.textSecondary,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {t('header.searchResults.recentSearches')}
+                  </span>
+                  <button
+                    onClick={clearRecentSearches}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      color: themeColors.textTertiary,
+                      padding: '2px 4px',
+                    }}
+                  >
+                    {t('header.searchResults.clearRecent')}
+                  </button>
+                </div>
+                {recentSearches.map((term) => (
+                  <div
+                    key={term}
+                    style={{ ...searchResultItemStyle, padding: '8px 12px', borderBottom: 'none' }}
+                    onClick={() => {
+                      setQuery(term)
+                      setShowSearchResults(true)
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = themeColors.grayLight
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }}
+                  >
+                    <Clock size={14} style={{ color: themeColors.textTertiary, flexShrink: 0, marginTop: '2px' }} />
+                    <span style={{ flex: 1, fontSize: '13px', color: themeColors.textPrimary }}>{term}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        removeRecentSearch(term)
+                      }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex' }}
+                    >
+                      <X size={12} style={{ color: themeColors.textTertiary }} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : isSearching ? (
               <div style={{ padding: '24px', textAlign: 'center', color: themeColors.textSecondary }}>
                 {t('header.searching')}
               </div>
-            ) : searchResults?.data && (searchResults.data.orders.length > 0 || searchResults.data.drivers.length > 0 || searchResults.data.clients.length > 0) ? (
+            ) : orderedCategories.length > 0 ? (
               <>
-                {(() => {
-                  const hasOrders = searchResults.data.orders.length > 0
-                  const hasDrivers = searchResults.data.drivers.length > 0
-                  const hasClients = searchResults.data.clients.length > 0
-                  
-                  // Calculer un score de pertinence pour chaque catégorie
-                  const normalizedQuery = debouncedQuery.toLowerCase().trim()
-                  
-                  // Fonction pour extraire les initiales d'un nom complet (première lettre de chaque mot)
-                  const getInitials = (fullName: string): string => {
-                    if (!fullName) return ''
-                    return fullName
-                      .split(/\s+/)
-                      .map(word => word.charAt(0))
-                      .join('')
-                      .toLowerCase()
-                  }
-                  
-                  // Fonction pour extraire les mots d'un nom (pour détecter les correspondances partielles)
-                  const getNameWords = (fullName: string): string[] => {
-                    if (!fullName) return []
-                    return fullName
-                      .toLowerCase()
-                      .split(/\s+/)
-                      .filter(word => word.length > 0)
-                  }
-                  
-                  // Détecter si la recherche ressemble à un ID de commande
-                  const isOrderId = normalizedQuery.startsWith('chlv') || 
-                                   normalizedQuery.match(/^[a-z]{4}-\d{6}-[a-z0-9]{4}$/i)
-                  
-                  // Détecter si c'est un nom (pas un ID de commande, lettres uniquement, peut contenir des espaces)
-                  const looksLikeName = !isOrderId && 
-                                       /^[a-z\s]+$/.test(normalizedQuery) &&
-                                       normalizedQuery.length >= 2
-                  
-                  // Score pour les commandes
-                  let ordersScore = 0
-                  if (hasOrders) {
-                    // Si la recherche est un ID de commande, priorité maximale
-                    if (isOrderId) {
-                      ordersScore = 100
-                    } else if (looksLikeName) {
-                      // Si c'est un nom, score très bas pour les commandes (car c'est indirect)
-                      // Seulement si le nom correspond au client ou livreur de la commande
-                      const nameMatches = (searchResults.data.orders as SearchOrder[]).filter(order => {
-                        const clientName = order.clientName?.toLowerCase() || ''
-                        const driverName = order.driverName?.toLowerCase() || ''
-                        return clientName.includes(normalizedQuery) || driverName.includes(normalizedQuery)
-                      }).length
-                      // Score très faible car recherche indirecte (via nom dans commande)
-                      ordersScore = nameMatches * 1
-                    } else {
-                      // Score basé sur le nombre de résultats et les correspondances exactes
-                      const exactMatches = (searchResults.data.orders as SearchOrder[]).filter(order => 
-                        order.deliveryId?.toLowerCase().includes(normalizedQuery) ||
-                        order.clientName?.toLowerCase().includes(normalizedQuery) ||
-                        order.driverName?.toLowerCase().includes(normalizedQuery)
-                      ).length
-                      ordersScore = exactMatches * 10 + searchResults.data.orders.length
-                    }
-                  }
-                  
-                  // Score pour les livreurs
-                  let driversScore = 0
-                  if (hasDrivers && looksLikeName) {
-                    // Analyser les correspondances dans les noms des livreurs
-                    const drivers = searchResults.data.drivers as SearchDriver[]
-                    const queryWords = normalizedQuery.split(/\s+/).filter(w => w.length > 0)
-                    
-                    let directNameMatches = 0
-                    let partialMatches = 0
-                    let initialsMatches = 0
-                    
-                    drivers.forEach(driver => {
-                      const fullName = driver.fullName?.toLowerCase() || ''
-                      if (!fullName) return
-                      
-                      const nameWords = getNameWords(fullName)
-                      const initials = getInitials(fullName)
-                      
-                      // Correspondance exacte dans le nom complet
-                      if (fullName.includes(normalizedQuery)) {
-                        directNameMatches++
-                      }
-                      // Correspondance avec les initiales
-                      else if (initials.startsWith(normalizedQuery) || normalizedQuery.startsWith(initials)) {
-                        initialsMatches++
-                      }
-                      // Correspondance partielle avec un mot du nom
-                      else if (queryWords.some(qw => nameWords.some(nw => nw.includes(qw) || qw.includes(nw)))) {
-                        partialMatches++
-                      }
-                    })
-                    
-                    // Score prioritaire : correspondances directes dans le nom
-                    driversScore = directNameMatches * 100 + initialsMatches * 50 + partialMatches * 25
-                  } else if (hasDrivers) {
-                    // Pour les recherches non-nom (téléphones, etc.)
-                    const exactMatches = (searchResults.data.drivers as SearchDriver[]).filter(driver => {
-                      const fullName = driver.fullName?.toLowerCase() || ''
-                      const phone = driver.phone?.toLowerCase() || ''
-                      return fullName.includes(normalizedQuery) || phone.includes(normalizedQuery)
-                    }).length
-                    driversScore = exactMatches * 10 + searchResults.data.drivers.length
-                  }
-                  
-                  // Score pour les clients
-                  let clientsScore = 0
-                  if (hasClients && looksLikeName) {
-                    // Analyser les correspondances dans les noms des clients
-                    const clients = searchResults.data.clients as SearchClient[]
-                    const queryWords = normalizedQuery.split(/\s+/).filter(w => w.length > 0)
-                    
-                    let directNameMatches = 0
-                    let partialMatches = 0
-                    let initialsMatches = 0
-                    
-                    clients.forEach(client => {
-                      const fullName = client.fullName?.toLowerCase() || ''
-                      if (!fullName) return
-                      
-                      const nameWords = getNameWords(fullName)
-                      const initials = getInitials(fullName)
-                      
-                      // Correspondance exacte dans le nom complet
-                      if (fullName.includes(normalizedQuery)) {
-                        directNameMatches++
-                      }
-                      // Correspondance avec les initiales
-                      else if (initials.startsWith(normalizedQuery) || normalizedQuery.startsWith(initials)) {
-                        initialsMatches++
-                      }
-                      // Correspondance partielle avec un mot du nom
-                      else if (queryWords.some(qw => nameWords.some(nw => nw.includes(qw) || qw.includes(nw)))) {
-                        partialMatches++
-                      }
-                    })
-                    
-                    // Score prioritaire : correspondances directes dans le nom
-                    clientsScore = directNameMatches * 100 + initialsMatches * 50 + partialMatches * 25
-                  } else if (hasClients) {
-                    // Pour les recherches non-nom (téléphones, etc.)
-                    const exactMatches = (searchResults.data.clients as SearchClient[]).filter(client => {
-                      const fullName = client.fullName?.toLowerCase() || ''
-                      const phone = client.phone?.toLowerCase() || ''
-                      return fullName.includes(normalizedQuery) || phone.includes(normalizedQuery)
-                    }).length
-                    clientsScore = exactMatches * 10 + searchResults.data.clients.length
-                  }
-                  
-                  // Créer un tableau des catégories avec leurs scores
-                  const categories = [
-                    { type: 'orders' as const, score: ordersScore, hasResults: hasOrders },
-                    { type: 'drivers' as const, score: driversScore, hasResults: hasDrivers },
-                    { type: 'clients' as const, score: clientsScore, hasResults: hasClients },
-                  ]
-                  
-                  // Trier par score décroissant, puis par ordre alphabétique si scores égaux
-                  categories.sort((a, b) => {
-                    if (a.score !== b.score) {
-                      return b.score - a.score
-                    }
-                    return a.type.localeCompare(b.type)
-                  })
-                  
-                  // Afficher les catégories dans l'ordre de pertinence
-                  return (
-                    <>
-                      {categories.map((category, categoryIndex) => {
-                        if (!category.hasResults) return null
-                        
-                        if (category.type === 'orders') {
+                {orderedCategories.map((category, categoryIndex) => {
+                  if (category.type === 'orders') {
+                    return (
+                      <Fragment key="orders">
+                        <div
+                          style={{
+                            padding: '12px 16px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: themeColors.textSecondary,
+                            textTransform: 'uppercase',
+                            borderBottom: `1px solid ${themeColors.cardBorder}`,
+                            borderTop: categoryIndex > 0 ? `1px solid ${themeColors.cardBorder}` : 'none',
+                            marginTop: categoryIndex > 0 ? '8px' : '0',
+                          }}
+                        >
+                          {t('header.searchResults.orders')} ({category.items.length})
+                        </div>
+                        {category.items.map((order) => {
+                          flatIndex++
+                          const idx = flatIndex
+                          const approximate = isApproximateMatch(
+                            [order.deliveryId, order.clientName, order.driverName, order.pickup, order.dropoff],
+                            debouncedQuery
+                          )
                           return (
-                            <Fragment key="orders">
-                              {/* Commandes */}
-                              <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary, textTransform: 'uppercase', borderBottom: `1px solid ${themeColors.cardBorder}`, borderTop: categoryIndex > 0 ? `1px solid ${themeColors.cardBorder}` : 'none', marginTop: categoryIndex > 0 ? '8px' : '0' }}>
-                                {t('header.searchResults.orders')} ({searchResults.data?.orders?.length || 0})
+                            <div
+                              key={order.id}
+                              ref={(el) => {
+                                if (el) resultItemRefs.current.set(idx, el)
+                                else resultItemRefs.current.delete(idx)
+                              }}
+                              style={{
+                                ...searchResultItemStyle,
+                                backgroundColor: activeIndex === idx ? themeColors.grayLight : 'transparent',
+                              }}
+                              id={`header-search-option-${idx}`}
+                              role="option"
+                              aria-selected={activeIndex === idx}
+                              onClick={() => handleSearchResultClick('order', order.id, order.status)}
+                              onMouseEnter={(e) => {
+                                setActiveIndex(idx)
+                                e.currentTarget.style.backgroundColor = themeColors.grayLight
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = activeIndex === idx ? themeColors.grayLight : 'transparent'
+                              }}
+                            >
+                              <Package size={20} style={{ color: themeColors.purplePrimary, flexShrink: 0 }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                  <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
+                                    {order.deliveryId ? highlightMatch(order.deliveryId, debouncedQuery) : order.id.slice(0, 8) + '...'}
+                                  </div>
+                                  <span
+                                    style={{
+                                      padding: '2px 8px',
+                                      borderRadius: '4px',
+                                      fontSize: '11px',
+                                      fontWeight: 600,
+                                      backgroundColor: getStatusColor(order.status) + '20',
+                                      color: getStatusColor(order.status),
+                                    }}
+                                  >
+                                    {getStatusLabel(order.status)}
+                                  </span>
+                                  {approximate && (
+                                    <span style={approximateBadgeStyle} title={t('header.searchResults.approximateMatch')}>
+                                      ≈
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '2px' }}>
+                                  {highlightMatch(order.pickup, debouncedQuery)} → {highlightMatch(order.dropoff, debouncedQuery)}
+                                </div>
+                                {order.price && (
+                                  <div style={{ fontSize: '12px', color: themeColors.purplePrimary, fontWeight: 600, marginBottom: '2px' }}>
+                                    {order.price}
+                                  </div>
+                                )}
+                                {(order.clientName || order.driverName) && (
+                                  <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginTop: '4px' }}>
+                                    {order.clientName && (
+                                      <>
+                                        {t('header.searchResults.client')}: {highlightMatch(order.clientName, debouncedQuery)}
+                                      </>
+                                    )}
+                                    {order.clientName && order.driverName && ' • '}
+                                    {order.driverName && (
+                                      <>
+                                        {t('header.searchResults.driver')}: {highlightMatch(order.driverName, debouncedQuery)}
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                                <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginTop: '2px' }}>
+                                  {order.createdAt}
+                                </div>
                               </div>
-                              {((searchResults.data?.orders as SearchOrder[]) || []).map((order: SearchOrder) => (
+                            </div>
+                          )
+                        })}
+                        {category.items.length >= 10 && (
+                          <div style={{ padding: '8px 16px', fontSize: '11px', color: themeColors.textTertiary, fontStyle: 'italic' }}>
+                            {t('header.searchResults.refineSearch')}
+                          </div>
+                        )}
+                      </Fragment>
+                    )
+                  }
+
+                  if (category.type === 'drivers') {
+                    return (
+                      <Fragment key="drivers">
+                        <div
+                          style={{
+                            padding: '12px 16px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: themeColors.textSecondary,
+                            textTransform: 'uppercase',
+                            borderBottom: `1px solid ${themeColors.cardBorder}`,
+                            borderTop: categoryIndex > 0 ? `1px solid ${themeColors.cardBorder}` : 'none',
+                            marginTop: categoryIndex > 0 ? '8px' : '0',
+                          }}
+                        >
+                          {t('header.searchResults.drivers')} ({category.items.length})
+                        </div>
+                        {category.items.map((driver) => {
+                          flatIndex++
+                          const idx = flatIndex
+                          const displayName = driver.fullName || driver.phone || t('header.searchResults.driver')
+                          const approximate = isApproximateMatch(
+                            [driver.fullName, driver.phone, driver.license_number],
+                            debouncedQuery
+                          )
+
+                          return (
+                            <div
+                              key={driver.id}
+                              ref={(el) => {
+                                if (el) resultItemRefs.current.set(idx, el)
+                                else resultItemRefs.current.delete(idx)
+                              }}
+                              style={{
+                                ...searchResultItemStyle,
+                                backgroundColor: activeIndex === idx ? themeColors.grayLight : 'transparent',
+                              }}
+                              id={`header-search-option-${idx}`}
+                              role="option"
+                              aria-selected={activeIndex === idx}
+                              onClick={() => handleSearchResultClick('driver', driver.id)}
+                              onMouseEnter={(e) => {
+                                setActiveIndex(idx)
+                                e.currentTarget.style.backgroundColor = themeColors.grayLight
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = activeIndex === idx ? themeColors.grayLight : 'transparent'
+                              }}
+                            >
+                              <User size={20} style={{ color: themeColors.purplePrimary, flexShrink: 0 }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                                  <div
+                                    style={{
+                                      fontSize: '14px',
+                                      fontWeight: 600,
+                                      color: themeColors.textPrimary,
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                    }}
+                                  >
+                                    {highlightMatch(displayName, debouncedQuery)}
+                                  </div>
+                                  <span
+                                    style={{
+                                      padding: '2px 8px',
+                                      borderRadius: '4px',
+                                      fontSize: '11px',
+                                      fontWeight: 600,
+                                      backgroundColor: driver.driver_type === 'internal' ? '#EF444420' : '#8B5CF620',
+                                      color: driver.driver_type === 'internal' ? '#EF4444' : '#8B5CF6',
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {driver.driver_type_label}
+                                  </span>
+                                  <span
+                                    style={{
+                                      padding: '2px 8px',
+                                      borderRadius: '4px',
+                                      fontSize: '11px',
+                                      fontWeight: 600,
+                                      backgroundColor: driver.is_online ? '#10B98120' : '#6B728020',
+                                      color: driver.is_online ? '#10B981' : '#6B7280',
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {driver.is_online ? t('header.searchResults.online') : t('header.searchResults.offline')}
+                                  </span>
+                                  {approximate && (
+                                    <span style={approximateBadgeStyle} title={t('header.searchResults.approximateMatch')}>
+                                      ≈
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '2px' }}>
+                                  {highlightMatch(driver.phone, debouncedQuery)}
+                                </div>
+                                <div style={{ display: 'flex', gap: '12px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                  <div style={{ fontSize: '11px', color: themeColors.textTertiary }}>
+                                    {driver.vehicle_type_label} {driver.license_number ? `• ${driver.license_number}` : ''}
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: themeColors.textTertiary }}>
+                                    ⭐ {driver.rating} ({driver.total_deliveries} {t('header.searchResults.deliveries')})
+                                  </div>
+                                  {driver.commission_balance && (
+                                    <div style={{ fontSize: '11px', color: themeColors.purplePrimary, fontWeight: 600 }}>
+                                      💰 {driver.commission_balance} ({driver.commission_rate})
+                                    </div>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginTop: '2px' }}>
+                                  {t('header.searchResults.registeredOn')} {driver.createdAt}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {category.items.length >= 10 && (
+                          <div
+                            style={viewAllLinkStyle}
+                            onClick={() => {
+                              if (debouncedQuery.trim().length >= 3) addRecentSearch(debouncedQuery)
+                              router.push(`/drivers?search=${encodeURIComponent(debouncedQuery)}`)
+                              setShowSearchResults(false)
+                              setQuery('')
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = themeColors.grayLight
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent'
+                            }}
+                          >
+                            {t('header.searchResults.viewAll')} <ArrowRight size={12} />
+                          </div>
+                        )}
+                      </Fragment>
+                    )
+                  }
+
+                  return (
+                    <Fragment key="clients">
+                      <div
+                        style={{
+                          padding: '12px 16px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: themeColors.textSecondary,
+                          textTransform: 'uppercase',
+                          borderBottom: `1px solid ${themeColors.cardBorder}`,
+                          borderTop: categoryIndex > 0 ? `1px solid ${themeColors.cardBorder}` : 'none',
+                          marginTop: categoryIndex > 0 ? '8px' : '0',
+                        }}
+                      >
+                        {t('header.searchResults.clients')} ({category.items.length})
+                      </div>
+                      {category.items.map((client) => {
+                        flatIndex++
+                        const idx = flatIndex
+                        const displayName = client.fullName || client.phone || t('header.searchResults.client')
+                        const approximate = isApproximateMatch([client.fullName, client.phone], debouncedQuery)
+
+                        return (
+                          <div
+                            key={client.id}
+                            ref={(el) => {
+                              if (el) resultItemRefs.current.set(idx, el)
+                              else resultItemRefs.current.delete(idx)
+                            }}
+                            style={{
+                              ...searchResultItemStyle,
+                              backgroundColor: activeIndex === idx ? themeColors.grayLight : 'transparent',
+                            }}
+                            id={`header-search-option-${idx}`}
+                            role="option"
+                            aria-selected={activeIndex === idx}
+                            onClick={() => handleSearchResultClick('client', client.id)}
+                            onMouseEnter={(e) => {
+                              setActiveIndex(idx)
+                              e.currentTarget.style.backgroundColor = themeColors.grayLight
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = activeIndex === idx ? themeColors.grayLight : 'transparent'
+                            }}
+                          >
+                            <User size={20} style={{ color: '#10B981', flexShrink: 0 }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                                 <div
-                                  key={order.id}
-                                  style={searchResultItemStyle}
-                                  onClick={() => handleSearchResultClick('order', order.id, order.status)}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = themeColors.grayLight
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'transparent'
+                                  style={{
+                                    fontSize: '14px',
+                                    fontWeight: 600,
+                                    color: themeColors.textPrimary,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
                                   }}
                                 >
-                                  <Package size={20} style={{ color: themeColors.purplePrimary, flexShrink: 0 }} />
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                      <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
-                                        {order.deliveryId || order.id.slice(0, 8) + '...'}
-                                      </div>
-                                      <span
-                                        style={{
-                                          padding: '2px 8px',
-                                          borderRadius: '4px',
-                                          fontSize: '11px',
-                                          fontWeight: 600,
-                                          backgroundColor: getStatusColor(order.status) + '20',
-                                          color: getStatusColor(order.status),
-                                        }}
-                                      >
-                                        {getStatusLabel(order.status)}
-                                      </span>
-                                    </div>
-                                    <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '2px' }}>
-                                      {order.pickup} → {order.dropoff}
-                                    </div>
-                                    {order.price && (
-                                      <div style={{ fontSize: '12px', color: themeColors.purplePrimary, fontWeight: 600, marginBottom: '2px' }}>
-                                        {order.price}
-                                      </div>
-                                    )}
-                                    {(order.clientName || order.driverName) && (
-                                      <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginTop: '4px' }}>
-                                        {order.clientName && `${t('header.searchResults.client')}: ${order.clientName}`}
-                                        {order.clientName && order.driverName && ' • '}
-                                        {order.driverName && `${t('header.searchResults.driver')}: ${order.driverName}`}
-                                      </div>
-                                    )}
-                                    <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginTop: '2px' }}>
-                                      {order.createdAt}
-                                    </div>
-                                  </div>
+                                  {highlightMatch(displayName, debouncedQuery)}
                                 </div>
-                              ))}
-                            </Fragment>
-                          )
-                        }
-                        
-                        if (category.type === 'drivers') {
-                          return (
-                            <Fragment key="drivers">
-                              {/* Livreurs */}
-                              <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary, textTransform: 'uppercase', borderBottom: `1px solid ${themeColors.cardBorder}`, borderTop: categoryIndex > 0 ? `1px solid ${themeColors.cardBorder}` : 'none', marginTop: categoryIndex > 0 ? '8px' : '0' }}>
-                                {t('header.searchResults.drivers')} ({searchResults.data?.drivers?.length || 0})
+                                <span
+                                  style={{
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    backgroundColor: '#10B98120',
+                                    color: '#10B981',
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {t('header.searchResults.client')}
+                                </span>
+                                {approximate && (
+                                  <span style={approximateBadgeStyle} title={t('header.searchResults.approximateMatch')}>
+                                    ≈
+                                  </span>
+                                )}
                               </div>
-                              {((searchResults.data?.drivers as SearchDriver[]) || []).map((driver: SearchDriver) => {
-                                const displayName = driver.fullName || driver.phone || t('header.searchResults.driver')
-                                
-                                return (
-                                  <div
-                                    key={driver.id}
-                                    style={searchResultItemStyle}
-                                    onClick={() => handleSearchResultClick('driver', driver.id)}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.backgroundColor = themeColors.grayLight
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.backgroundColor = 'transparent'
-                                    }}
-                                  >
-                                    <User size={20} style={{ color: themeColors.purplePrimary, flexShrink: 0 }} />
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                                        <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          {displayName}
-                                        </div>
-                                        <span
-                                          style={{
-                                            padding: '2px 8px',
-                                            borderRadius: '4px',
-                                            fontSize: '11px',
-                                            fontWeight: 600,
-                                            backgroundColor: driver.driver_type === 'internal' ? '#EF444420' : '#8B5CF620',
-                                            color: driver.driver_type === 'internal' ? '#EF4444' : '#8B5CF6',
-                                            flexShrink: 0,
-                                          }}
-                                        >
-                                          {driver.driver_type_label}
-                                        </span>
-                                        <span
-                                          style={{
-                                            padding: '2px 8px',
-                                            borderRadius: '4px',
-                                            fontSize: '11px',
-                                            fontWeight: 600,
-                                            backgroundColor: driver.is_online ? '#10B98120' : '#6B728020',
-                                            color: driver.is_online ? '#10B981' : '#6B7280',
-                                            flexShrink: 0,
-                                          }}
-                                        >
-                                          {driver.is_online ? t('header.searchResults.online') : t('header.searchResults.offline')}
-                                        </span>
-                                      </div>
-                                      <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '2px' }}>
-                                        {driver.phone}
-                                      </div>
-                                      <div style={{ display: 'flex', gap: '12px', marginTop: '4px', flexWrap: 'wrap' }}>
-                                        <div style={{ fontSize: '11px', color: themeColors.textTertiary }}>
-                                          {driver.vehicle_type_label} {driver.license_number ? `• ${driver.license_number}` : ''}
-                                        </div>
-                                        <div style={{ fontSize: '11px', color: themeColors.textTertiary }}>
-                                          ⭐ {driver.rating} ({driver.total_deliveries} {t('header.searchResults.deliveries')})
-                                        </div>
-                                        {driver.commission_balance && (
-                                          <div style={{ fontSize: '11px', color: themeColors.purplePrimary, fontWeight: 600 }}>
-                                            💰 {driver.commission_balance} ({driver.commission_rate})
-                                          </div>
-                                        )}
-                                      </div>
-                                      <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginTop: '2px' }}>
-                                        {t('header.searchResults.registeredOn')} {driver.createdAt}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </Fragment>
-                          )
-                        }
-                        
-                        if (category.type === 'clients') {
-                          return (
-                            <Fragment key="clients">
-                              {/* Clients */}
-                              <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary, textTransform: 'uppercase', borderBottom: `1px solid ${themeColors.cardBorder}`, borderTop: categoryIndex > 0 ? `1px solid ${themeColors.cardBorder}` : 'none', marginTop: categoryIndex > 0 ? '8px' : '0' }}>
-                                {t('header.searchResults.clients')} ({searchResults.data?.clients?.length || 0})
+                              <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '2px' }}>
+                                {highlightMatch(client.phone, debouncedQuery)}
                               </div>
-                              {((searchResults.data?.clients as SearchClient[]) || []).map((client: SearchClient) => {
-                                const displayName = client.fullName || client.phone || t('header.searchResults.client')
-                                
-                                return (
-                                  <div
-                                    key={client.id}
-                                    style={searchResultItemStyle}
-                                    onClick={() => handleSearchResultClick('client', client.id)}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.backgroundColor = themeColors.grayLight
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.backgroundColor = 'transparent'
-                                    }}
-                                  >
-                                    <User size={20} style={{ color: '#10B981', flexShrink: 0 }} />
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                        <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          {displayName}
-                                        </div>
-                                        <span
-                                          style={{
-                                            padding: '2px 8px',
-                                            borderRadius: '4px',
-                                            fontSize: '11px',
-                                            fontWeight: 600,
-                                            backgroundColor: '#10B98120',
-                                            color: '#10B981',
-                                            flexShrink: 0,
-                                          }}
-                                        >
-                                          {t('header.searchResults.client')}
-                                        </span>
-                                      </div>
-                                      <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '2px' }}>
-                                        {client.phone}
-                                      </div>
-                                      <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginTop: '2px' }}>
-                                        {t('header.searchResults.registeredOn')} {client.createdAt}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </Fragment>
-                          )
-                        }
-                        
-                        return null
+                              <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginTop: '2px' }}>
+                                {t('header.searchResults.registeredOn')} {client.createdAt}
+                              </div>
+                            </div>
+                          </div>
+                        )
                       })}
-                    </>
+                      {category.items.length >= 10 && (
+                        <div
+                          style={{ ...viewAllLinkStyle, borderBottom: 'none' }}
+                          onClick={() => {
+                            if (debouncedQuery.trim().length >= 3) addRecentSearch(debouncedQuery)
+                            router.push(`/users?search=${encodeURIComponent(debouncedQuery)}`)
+                            setShowSearchResults(false)
+                            setQuery('')
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = themeColors.grayLight
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent'
+                          }}
+                        >
+                          {t('header.searchResults.viewAll')} <ArrowRight size={12} />
+                        </div>
+                      )}
+                    </Fragment>
                   )
-                })()}
+                })}
               </>
             ) : (
               <div style={{ padding: '24px', textAlign: 'center', color: themeColors.textSecondary }}>

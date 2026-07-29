@@ -3,6 +3,7 @@ import pool from '../config/db.js';
 import { formatDeliveryId } from '../utils/formatDeliveryId.js';
 import logger from '../utils/logger.js';
 import { getDateRange, normalizeDate } from './adminControllerUtils.js';
+import { buildPhoneLookupDigitKeys, buildPhoneLookupDigitSuffixKeys } from '../utils/phoneE164CI.js';
 
 export const getAdminDashboardStats = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -387,6 +388,46 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
     const isVehicleTypeSearch = ['moto', 'vehicule', 'cargo', 'véhicule'].includes(trimmedQuery);
     const isDriverTypeSearch = ['interne', 'internal', 'partenaire', 'partner'].includes(trimmedQuery);
 
+    // Tolérance aux fautes de frappe (pg_trgm, opérateur `%`, seuil par défaut 0.3) et aux accents
+    // (unaccent) — limitée aux requêtes qui ressemblent à un nom pour éviter les faux positifs
+    // sur téléphone/email/ID (des chiffres partagent facilement des trigrammes).
+    const isNameSearch = /^[a-zà-ÿ\s'-]+$/i.test(exactSearchTerm) && exactSearchTerm.length >= 3;
+
+    const nameFuzzyCondition = (aliasA: string, aliasB?: string) => {
+      if (!isNameSearch) return '';
+      const part = (alias: string) => {
+        const p = alias ? `${alias}.` : '';
+        return `
+        OR public.f_unaccent(LOWER(${p}first_name)) % public.f_unaccent(LOWER($2))
+        OR public.f_unaccent(LOWER(${p}last_name)) % public.f_unaccent(LOWER($2))
+        OR public.f_unaccent(LOWER(${p}first_name)) ILIKE public.f_unaccent(LOWER($1))
+        OR public.f_unaccent(LOWER(${p}last_name)) ILIKE public.f_unaccent(LOWER($1))
+        OR (${p}first_name IS NOT NULL AND ${p}last_name IS NOT NULL AND public.f_unaccent(LOWER(CONCAT(${p}first_name, ' ', ${p}last_name))) % public.f_unaccent(LOWER($2)))
+        OR (${p}first_name IS NOT NULL AND ${p}last_name IS NOT NULL AND public.f_unaccent(LOWER(CONCAT(${p}first_name, ' ', ${p}last_name))) ILIKE public.f_unaccent(LOWER($1)))
+      `;
+      };
+      return part(aliasA) + (aliasB ? part(aliasB) : '');
+    };
+
+    // Tolérance aux formats de téléphone : "07 01 02 03", "+225 07 01 02 03", "0701020304"
+    // doivent tous se retrouver, quel que soit le format stocké en base. Réutilise l'utilitaire
+    // déjà utilisé pour la résolution destinataire (resolveRecipientUserIdByPhone.ts) plutôt
+    // qu'une comparaison substring naïve : match exact sur les représentations chiffrées connues
+    // (E.164, forme locale, suffixe 10 chiffres), pas de faux positif par sous-chaîne.
+    const phoneDigitKeys = isPhoneSearch ? buildPhoneLookupDigitKeys(query.trim()) : [];
+    const phoneSuffixKeys = buildPhoneLookupDigitSuffixKeys(phoneDigitKeys);
+    const hasPhoneKeys = phoneDigitKeys.length > 0;
+
+    const phoneFuzzyCondition = (alias: string | undefined, keysIdx: number, suffixIdx: number) => {
+      if (!hasPhoneKeys) return '';
+      const column = alias ? `${alias}.phone` : 'phone';
+      const normalized = `regexp_replace(COALESCE(${column}, ''), '[^0-9]', '', 'g')`;
+      return `
+        OR ${normalized} = ANY($${keysIdx}::text[])
+        OR (array_length($${suffixIdx}::text[], 1) > 0 AND char_length(${normalized}) >= 10 AND right(${normalized}, 10) = ANY($${suffixIdx}::text[]))
+      `;
+    };
+
     let deliveryIdCondition = '';
     if (isOrderSearch) {
       deliveryIdCondition = `
@@ -433,7 +474,10 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
       LOWER(CONCAT(COALESCE(d.first_name, ''), ' ', COALESCE(d.last_name, ''))) ILIKE LOWER($1) OR
       LOWER(CONCAT(COALESCE(d.last_name, ''), ' ', COALESCE(d.first_name, ''))) ILIKE LOWER($1)
       ${deliveryIdCondition}
-      ${priceSearchCondition})
+      ${priceSearchCondition}
+      ${nameFuzzyCondition('u', 'd')}
+      ${phoneFuzzyCondition('u', 6, 7)}
+      ${phoneFuzzyCondition('d', 6, 7)})
     `;
 
     const ordersQuery = `
@@ -488,6 +532,8 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
         CAST(COALESCE(dp.total_deliveries, 0) AS TEXT) ILIKE LOWER($1) OR
         CAST(COALESCE(cb.balance, 0) AS TEXT) ILIKE LOWER($1) OR
         CAST(COALESCE(cb.commission_rate, 10) AS TEXT) ILIKE LOWER($1)
+        ${nameFuzzyCondition('u')}
+        ${phoneFuzzyCondition('u', 4, 5)}
       )
       ORDER BY
         CASE
@@ -513,6 +559,8 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
         email ILIKE $1 OR phone ILIKE $1 OR first_name ILIKE $1 OR last_name ILIKE $1 OR
         (first_name IS NOT NULL AND last_name IS NOT NULL AND CONCAT(first_name, ' ', last_name) ILIKE $1) OR
         (first_name IS NOT NULL AND last_name IS NOT NULL AND CONCAT(last_name, ' ', first_name) ILIKE $1)
+        ${nameFuzzyCondition('')}
+        ${phoneFuzzyCondition(undefined, 4, 5)}
       )
       ORDER BY
         CASE
@@ -532,16 +580,17 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
 
     let ordersResult, driversResult, clientsResult;
     try {
-      const ordersParams: any[] = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`];
-      if (isOrderSearch) {
-        ordersParams.push(`${upperQuery}%`, upperQuery);
-      }
+      // $4/$5 servent uniquement à deliveryIdCondition (utilisés seulement si isOrderSearch),
+      // $6/$7 servent à phoneFuzzyCondition (utilisés seulement si hasPhoneKeys) — toujours liés
+      // pour garder une numérotation de paramètres stable, même quand la clause SQL correspondante
+      // n'est pas insérée dans le texte de la requête.
+      const ordersParams: any[] = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`, `${upperQuery}%`, upperQuery, phoneDigitKeys, phoneSuffixKeys];
       ordersResult = await pool.query(ordersQuery, ordersParams);
 
-      const driversParams = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`];
+      const driversParams = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`, phoneDigitKeys, phoneSuffixKeys];
       driversResult = await pool.query(driversQuery, driversParams);
 
-      const clientsParams = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`];
+      const clientsParams = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`, phoneDigitKeys, phoneSuffixKeys];
       clientsResult = await pool.query(clientsQuery, clientsParams);
     } catch (queryError: any) {
       logger.error('[getAdminGlobalSearch] Erreur lors de la requête SQL:', queryError);

@@ -116,7 +116,12 @@
       "online": "Online",
       "offline": "Offline",
       "deliveries": "deliveries",
-      "registeredOn": "Registered on"
+      "registeredOn": "Registered on",
+      "recentSearches": "Recent searches",
+      "clearRecent": "Clear",
+      "viewAll": "View all results",
+      "approximateMatch": "Approximate match",
+      "refineSearch": "Refine your search for more results"
     }
   },
   "partnersPage": {

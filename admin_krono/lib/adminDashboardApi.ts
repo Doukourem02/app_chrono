@@ -584,7 +584,7 @@ export class AdminDashboardApi extends AdminApiBase {
   /**
    * Recherche globale
    */
-  async globalSearch(query: string): Promise<{
+  async globalSearch(query: string, signal?: AbortSignal): Promise<{
     success: boolean
     data?: {
       orders: unknown[]
@@ -598,8 +598,12 @@ export class AdminDashboardApi extends AdminApiBase {
 
       let response: Response
       try {
-        response = await this.fetchWithAuth(url)
+        response = await this.fetchWithAuth(url, { signal })
       } catch (authError: unknown) {
+        // Ne pas avaler un abort volontaire (nouvelle frappe pendant que la requête précédente
+        // était en vol) dans une réponse "échec" — react-query doit le traiter comme annulé,
+        // pas comme "aucun résultat", sinon on risque un flash de résultats vides.
+        if (authError instanceof DOMException && authError.name === 'AbortError') throw authError
         logger.warn('[adminApiService] Authentication error:', getErrorMessage(authError))
         return {
           success: false,
@@ -644,6 +648,7 @@ export class AdminDashboardApi extends AdminApiBase {
         },
       }
     } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') throw error
       logger.error('[adminApiService] Error in globalSearch:', error)
       return {
         success: false,

@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useTransition } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Search, Filter, User, Briefcase, Wallet, AlertCircle, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import { useDriverOnlineStatus } from '@/hooks/useDriverOnlineStatus'
@@ -18,12 +18,14 @@ type BalanceStatus = 'all' | 'active' | 'suspended' | 'low_balance'
 
 export default function DriversPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const t = useTranslation()
   const queryClient = useQueryClient()
   const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin)
   const [currentPage, setCurrentPage] = useState(1)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
+  // Pré-rempli depuis "Voir tous les résultats" dans la recherche globale du Header
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(() => searchParams.get('search') || '')
   const [typeFilter, setTypeFilter] = useState<DriverType>('all')
   const [balanceStatusFilter, setBalanceStatusFilter] = useState<BalanceStatus>('all')
   const [, startTransition] = useTransition()
