@@ -1,4 +1,4 @@
-# 🚚 Chrono Livraison – Monorepo
+# 🚚 krono Livraison – Monorepo
 
 Plateforme de livraison en temps réel connectant clients, chauffeurs **et administrateurs**. Ce dépôt rassemble :
 
