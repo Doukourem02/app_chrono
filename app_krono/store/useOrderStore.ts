@@ -84,10 +84,19 @@ function mergeOrderDriver(
   };
 }
 
+interface DriverConnectionInfo {
+  connected: boolean;
+  /** Date.now() de la dernière preuve de vie (position reçue ou event explicite backend). */
+  updatedAt: number;
+}
+
 interface OrderStore {
-  activeOrders: OrderRequest[]; 
-  selectedOrderId: string | null; 
+  activeOrders: OrderRequest[];
+  selectedOrderId: string | null;
   driverCoords: Map<string, { latitude: number; longitude: number }>;
+  /** État de connexion du livreur par commande — permet d'afficher "position peut-être obsolète"
+   * plutôt qu'un marker figé sans explication quand le livreur perd le réseau. */
+  driverConnection: Map<string, DriverConnectionInfo>;
   /** Quand true, afficher le formulaire de création au lieu du suivi (ex: retour depuis Détails de la course) */
   preferCreationForm: boolean;
   /** Un coup : l’utilisateur a choisi « Nouvelle commande » depuis le suivi — la map doit réinitialiser l’UI et ouvrir le formulaire même si une course est en cours. */
@@ -98,6 +107,7 @@ interface OrderStore {
   removeOrder: (orderId: string) => void;
   setSelectedOrder: (orderId: string | null) => void;
   setDriverCoordsForOrder: (orderId: string, coords: { latitude: number; longitude: number } | null) => void;
+  setDriverConnectionStatus: (orderId: string, connected: boolean) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
   updateFromSocket: (payload: { order?: Partial<OrderRequest> | null; location?: { latitude?: number; longitude?: number } | null; proof?: any }) => void;
   replace: (freshOrders: OrderRequest[]) => void;
@@ -115,6 +125,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   activeOrders: [],
   selectedOrderId: null,
   driverCoords: new Map(),
+  driverConnection: new Map(),
   preferCreationForm: false,
   mapNewOrderIntentPending: false,
 
@@ -195,16 +206,19 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     const filteredOrders = state.activeOrders.filter(order => order.id !== orderId);
     const newCoords = new Map(state.driverCoords);
     newCoords.delete(orderId);
-    
+    const newConnection = new Map(state.driverConnection);
+    newConnection.delete(orderId);
+
     let newSelectedId = state.selectedOrderId;
     if (state.selectedOrderId === orderId) {
       newSelectedId = filteredOrders.length > 0 ? filteredOrders[0].id : null;
     }
-    
+
     return {
       activeOrders: filteredOrders,
       selectedOrderId: newSelectedId,
       driverCoords: newCoords,
+      driverConnection: newConnection,
     };
   }),
 
@@ -219,7 +233,19 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     } else {
       newCoords.delete(orderId);
     }
-    return { driverCoords: newCoords };
+    // Une position fraîche est en soi une preuve que le livreur est connecté — sert de filet
+    // de secours si l'event driver:connection:status explicite venait à être manqué.
+    const newConnection = new Map(state.driverConnection);
+    if (coords) {
+      newConnection.set(orderId, { connected: true, updatedAt: Date.now() });
+    }
+    return { driverCoords: newCoords, driverConnection: newConnection };
+  }),
+
+  setDriverConnectionStatus: (orderId, connected) => set((state) => {
+    const newConnection = new Map(state.driverConnection);
+    newConnection.set(orderId, { connected, updatedAt: Date.now() });
+    return { driverConnection: newConnection };
   }),
 
   updateOrderStatus: (orderId, status) => set((state) => {
@@ -404,10 +430,12 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     ];
     const mergedIds = new Set(merged.map((o) => o.id));
     const newCoords = new Map([...state.driverCoords].filter(([id]) => mergedIds.has(id)));
+    const newConnection = new Map([...state.driverConnection].filter(([id]) => mergedIds.has(id)));
     const selectedStillValid = merged.some((o) => o.id === state.selectedOrderId);
     return {
       activeOrders: merged,
       driverCoords: newCoords,
+      driverConnection: newConnection,
       selectedOrderId: selectedStillValid
         ? state.selectedOrderId
         : merged.length > 0 ? merged[0].id : null,
@@ -418,6 +446,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     activeOrders: [],
     selectedOrderId: null,
     driverCoords: new Map(),
+    driverConnection: new Map(),
     preferCreationForm: false,
     mapNewOrderIntentPending: false,
   }),

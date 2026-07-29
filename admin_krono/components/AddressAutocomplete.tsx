@@ -287,7 +287,8 @@ export default function AddressAutocomplete({
         const overpassPromise = !streetLike
           ? searchOverpassPoi(
               trimmed,
-              Number.isFinite(proxLat) && Number.isFinite(proxLng) ? { lat: proxLat, lng: proxLng } : undefined
+              Number.isFinite(proxLat) && Number.isFinite(proxLng) ? { lat: proxLat, lng: proxLng } : undefined,
+              cityHint
             ).catch(() => [] as OverpassPoiResult[])
           : Promise.resolve([] as OverpassPoiResult[])
 

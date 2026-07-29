@@ -6,6 +6,7 @@ import {Alert,Animated,Dimensions,StyleSheet,Text,TouchableOpacity,View,} from "
 import type { MapRefHandle } from "../../hooks/useMapLogic";
 import { DeliveryBottomSheet } from "../../components/DeliveryBottomSheet";
 import { DeliveryMapView } from "../../components/DeliveryMapView";
+import { DriverConnectionBanner } from "../../components/DriverConnectionBanner";
 import { DeliveryMethodBottomSheet } from "../../components/DeliveryMethodBottomSheet";
 import { DriverSearchBottomSheet } from "../../components/DriverSearchBottomSheet";
 import { OrderDetailsSheet } from "../../components/OrderDetailsSheet";
@@ -1339,6 +1340,7 @@ export default function MapPage() {
           }
         }}
       />
+      <DriverConnectionBanner orderId={currentOrder?.id} orderStatus={currentOrder?.status} />
 
       {/* Bouton retour flottant pour la recherche de livreur ou driver accepté - au-dessus du bottom sheet */}
       {/* Ne pas afficher le bouton retour si on est en train de créer une nouvelle commande */}

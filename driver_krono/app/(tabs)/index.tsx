@@ -124,7 +124,22 @@ export default function Index() {
           }
         } else {
           sessionExpiredRef.current = false;
-          if (value) void requestBackgroundLocationPermissionForDuty();
+          if (value) {
+            void requestBackgroundLocationPermissionForDuty().then((granted) => {
+              if (granted) return;
+              // Sans "Toujours autoriser", le GPS s'arrête dès que l'écran se verrouille ou que
+              // l'app passe en arrière-plan — le livreur ne le sait pas, le client voit juste un
+              // marker figé sans explication (audit carte/géoloc 2026-07-29).
+              Alert.alert(
+                "Suivi en arrière-plan désactivé",
+                "Sans l'autorisation \"Toujours\" pour la localisation, votre position ne sera plus transmise dès que l'écran se verrouille ou que vous quittez l'app — les clients risquent de vous perdre de vue en pleine course. Activez-la dans les réglages du téléphone.",
+                [
+                  { text: "Plus tard", style: "cancel" },
+                  { text: "Ouvrir les réglages", onPress: openAppLocationSettings },
+                ]
+              );
+            });
+          }
         }
       }).catch((error) => {
         isTogglingRef.current = false;

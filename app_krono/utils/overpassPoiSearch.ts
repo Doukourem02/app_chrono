@@ -4,8 +4,16 @@
  */
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 
-// Bbox Abidjan (south, west, north, east)
+// Bbox Abidjan (south, west, north, east) — utilisée seulement en dernier recours, quand aucune
+// position réelle n'est connue (comportement historique). Sinon la bbox est dérivée de `proximity`.
 const ABIDJAN_BBOX = '5.15,-4.25,5.55,-3.85';
+
+/** Demi-largeur (°) de la boîte de recherche autour de la position réelle — couvre une ville de taille moyenne. */
+const BBOX_HALF_SPAN_DEG = 0.2;
+
+function bboxAround(lat: number, lng: number): string {
+  return `${lat - BBOX_HALF_SPAN_DEG},${lng - BBOX_HALF_SPAN_DEG},${lat + BBOX_HALF_SPAN_DEG},${lng + BBOX_HALF_SPAN_DEG}`;
+}
 
 const TERM_TO_OSM: Record<string, { tag: string; value: string }> = {
   pharmacie: { tag: 'amenity', value: 'pharmacy' },
@@ -63,13 +71,14 @@ export interface OverpassPoiResult {
 
 export async function searchOverpassPoi(
   query: string,
-  proximity?: { lat: number; lng: number }
+  proximity?: { lat: number; lng: number },
+  cityHint?: string
 ): Promise<OverpassPoiResult[]> {
   const trimmed = query.trim();
   if (!trimmed || trimmed.length < 2) return [];
 
   const category = detectPoiCategory(trimmed);
-  const bbox = ABIDJAN_BBOX;
+  const bbox = proximity ? bboxAround(proximity.lat, proximity.lng) : ABIDJAN_BBOX;
 
   let overpassQuery: string;
 
@@ -113,7 +122,8 @@ export async function searchOverpassPoi(
       seen.add(key);
 
       const street = el.tags?.['addr:street'] || '';
-      const addr = street ? `${street}, Abidjan` : 'Abidjan';
+      const cityLabel = cityHint || 'Abidjan';
+      const addr = street ? `${street}, ${cityLabel}` : cityLabel;
       const fullAddress = `${name}, ${addr}`;
 
       results.push({

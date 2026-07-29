@@ -254,12 +254,16 @@ export const useAnimatedRoute = ({
           setRouteCoordinates(fallbackRoute);
           setAnimatedCoordinates(fallbackRoute);
           setError('Route non disponible, affichage ligne droite');
+          // Ne pas garder une durée Mapbox obsolète : calculateFullETA bascule proprement sur
+          // une estimation à vol d'oiseau quand hasTrafficData est false (etaCalculator.ts).
+          setTrafficData({ hasTrafficData: false });
         }
       } catch {
         setError('Erreur lors du calcul de la route');
         const fallbackRoute = [origin, destination];
         setRouteCoordinates(fallbackRoute);
         setAnimatedCoordinates(fallbackRoute);
+        setTrafficData({ hasTrafficData: false });
       } finally {
         setIsLoading(false);
       }
@@ -290,10 +294,16 @@ export const useAnimatedRoute = ({
             // (on garde l'animation en cours si la route est similaire)
             setRouteCoordinates(route);
             lastRecalcRef.current = Date.now();
+          } else {
+            // Échec silencieux volontaire (ne pas interrompre l'utilisateur), mais ne pas non
+            // plus garder une durée trafic vieille de potentiellement plusieurs minutes :
+            // calculateFullETA bascule sur une estimation à vol d'oiseau si hasTrafficData=false.
+            setTrafficData({ hasTrafficData: false });
           }
         } catch (err) {
           // Ignorer les erreurs silencieusement pour ne pas perturber l'utilisateur
           logger.debug('Erreur recalcul route trafic:', undefined, err);
+          setTrafficData({ hasTrafficData: false });
         }
       }
     };

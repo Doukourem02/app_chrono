@@ -495,7 +495,12 @@ export default function MapboxAddressAutocomplete({
         return;
       }
 
-      const baseParams = { country, language: 'fr', proximity };
+      // refCoords priorise proximityCoords (position réelle transmise par l'appelant) sur le
+      // prop `proximity` (chaîne statique, par défaut Abidjan) — sans ça, un appelant qui passe
+      // seulement proximityCoords (cas le plus courant, cf. DeliveryBottomSheet.tsx) voyait le
+      // biais Mapbox rester sur Abidjan malgré une position réelle connue.
+      const effectiveProximity = refCoords ? `${refCoords.longitude},${refCoords.latitude}` : proximity;
+      const baseParams = { country, language: 'fr', proximity: effectiveProximity };
       const extraTypes = isNumericQuery(trimmed) ? 'postcode,address' : undefined;
       const streetLike = isStreetLikeQuery(trimmed);
       const streetTypes = extraTypes || 'street,address';
@@ -527,12 +532,12 @@ export default function MapboxAddressAutocomplete({
       }
 
       try {
-        const [proxLng, proxLat] = proximity.split(',').map((x) => parseFloat(x.trim()));
         /** Lancer tout de suite en parallèle des appels Mapbox — sinon temps total = Mapbox + Nominatim (régression). */
         const overpassPromise = !streetLike
           ? searchOverpassPoi(
               trimmed,
-              Number.isFinite(proxLat) && Number.isFinite(proxLng) ? { lat: proxLat, lng: proxLng } : undefined,
+              refCoords ? { lat: refCoords.latitude, lng: refCoords.longitude } : undefined,
+              cityHint,
             ).catch((err) => {
               logger.warn('[MapboxAddressAutocomplete] Overpass non disponible:', err);
               return [] as OverpassPoiResult[];
@@ -541,10 +546,9 @@ export default function MapboxAddressAutocomplete({
 
         const nominatimQ = trimmed.toLowerCase().includes(cityHint.toLowerCase()) ? trimmed : `${trimmed}, ${cityHint}`;
         // Boîte souple (bounded=0 → simple préférence, pas un filtre dur) autour du point de proximité.
-        const viewbox =
-          Number.isFinite(proxLat) && Number.isFinite(proxLng)
-            ? `${proxLng - 0.15},${proxLat + 0.15},${proxLng + 0.15},${proxLat - 0.15}`
-            : undefined;
+        const viewbox = refCoords
+          ? `${refCoords.longitude - 0.15},${refCoords.latitude + 0.15},${refCoords.longitude + 0.15},${refCoords.latitude - 0.15}`
+          : undefined;
         const nominatimPromise = fetch(
           `${NOMINATIM_URL}?${new URLSearchParams({
             q: nominatimQ,
@@ -687,7 +691,7 @@ export default function MapboxAddressAutocomplete({
         if (gen !== suggestFetchGenRef.current) return;
       }
     },
-    [accessToken, sessionToken, country, proximity, savedAddresses, cityHint],
+    [accessToken, sessionToken, country, proximity, refCoords, savedAddresses, cityHint],
   );
 
   const handleInputChange = useCallback(

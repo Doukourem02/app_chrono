@@ -10,6 +10,11 @@ import { useRealtimeDegradedStore } from '../store/useRealtimeDegradedStore';
 import { soundService } from './soundService';
 import { apiService } from './apiService';
 
+/** Aligné sur le seuil côté client (DriverConnectionBanner.tsx, app_krono) — le livreur doit
+ * savoir que sa connexion est instable aussi vite que le client le sait, pas seulement après
+ * épuisement des 24 tentatives de reconnexion (reconnect_failed, plusieurs minutes). */
+const DEGRADED_BANNER_DELAY_MS = 45_000;
+
 class OrderSocketService {
   private socket: Socket | null = null;
   private driverId: string | null = null;
@@ -21,6 +26,7 @@ class OrderSocketService {
   private mutedBatchOfferIds: Set<string> = new Set();/** Évite d'empiler plusieurs fois le même écran batch (batch-assigned peut arriver N fois). */
   private navigatedBatchIds: Set<string> = new Set();/** Hooks enregistrés pour déclencher un resync après un événement socket critique. */
   private refetchListeners: Set<(orderId: string) => void> = new Set();
+  private degradedBannerTimer: ReturnType<typeof setTimeout> | null = null;
 
   addRefetchListener(fn: (orderId: string) => void): () => void {
     this.refetchListeners.add(fn);
@@ -126,6 +132,10 @@ class OrderSocketService {
     this.setupConnectionErrorHandler();
 
     this.socket.on('connect', () => {
+      if (this.degradedBannerTimer) {
+        clearTimeout(this.degradedBannerTimer);
+        this.degradedBannerTimer = null;
+      }
       useRealtimeDegradedStore.getState().setOrdersSocketDegraded(false);
       logger.info('Socket connecté pour commandes');
       this.isConnected = true;
@@ -149,6 +159,17 @@ class OrderSocketService {
       if (reason === 'io server disconnect') {
         logger.info('Le serveur a forcé la déconnexion, reconnexion automatique...', undefined);
       }
+
+      // Ne pas attendre l'épuisement des 24 tentatives de reconnexion (reconnect_failed,
+      // potentiellement plusieurs minutes) pour prévenir le livreur — le client, lui, est déjà
+      // informé bien plus tôt (cf. DriverConnectionBanner.tsx, seuil ~45-90s).
+      if (this.degradedBannerTimer) clearTimeout(this.degradedBannerTimer);
+      this.degradedBannerTimer = setTimeout(() => {
+        this.degradedBannerTimer = null;
+        if (!this.isConnected) {
+          useRealtimeDegradedStore.getState().setOrdersSocketDegraded(true);
+        }
+      }, DEGRADED_BANNER_DELAY_MS);
     });
   }
 
@@ -552,6 +573,10 @@ class OrderSocketService {
 
   disconnect() {
     this.connectGeneration += 1;
+    if (this.degradedBannerTimer) {
+      clearTimeout(this.degradedBannerTimer);
+      this.degradedBannerTimer = null;
+    }
     useRealtimeDegradedStore.getState().setOrdersSocketDegraded(false);
     if (this.socket) {
       this.socket.disconnect();

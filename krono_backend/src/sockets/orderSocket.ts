@@ -280,6 +280,26 @@ function clearDriverSocketOfflineTimer(driverId: string): void {
   }
 }
 
+/**
+ * Prévient le(s) client(s) suivant une commande de ce livreur que sa connexion vient d'être
+ * perdue (connected=false) ou rétablie (connected=true) — sans ça, un client dont le livreur
+ * perd le réseau voit juste un marker figé sur la carte sans aucune indication que quelque
+ * chose ne va pas (cf. audit carte/géoloc 2026-07-29).
+ */
+function notifyClientsOfDriverConnectionState(io: SocketIOServer, driverId: string, connected: boolean): void {
+  const ts = new Date().toISOString();
+  for (const order of activeOrders.values()) {
+    if (order.driverId !== driverId) continue;
+    const userSocketId = connectedUsers.get(order.user.id);
+    if (!userSocketId) continue;
+    io.to(userSocketId).emit('driver:connection:status', {
+      orderId: order.id,
+      connected,
+      ts,
+    });
+  }
+}
+
 async function markDriverOfflineAfterSocketGrace(io: SocketIOServer, driverId: string): Promise<void> {
   driverDisconnectTimers.delete(driverId);
   if (connectedDrivers.has(driverId)) {
@@ -309,6 +329,7 @@ async function markDriverOfflineAfterSocketGrace(io: SocketIOServer, driverId: s
     userId: driverId,
     is_online: false,
   });
+  notifyClientsOfDriverConnectionState(io, driverId, false);
 
   logger.info(`[socket-disconnect] Livreur retiré du cache mémoire (socket absent après ${DRIVER_OFFLINE_GRACE_MS}ms), DB inchangée: ${maskUserId(driverId)}`);
 
@@ -1020,6 +1041,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       socket.driverId = authUserId;
       void rehydrateDriverStatusFromDb(authUserId);
       void emitPendingBatchOffersToDriver(authUserId, socket.id).catch(() => {});
+      notifyClientsOfDriverConnectionState(io, authUserId, true);
       if (DEBUG) logger.debug(`[DIAGNOSTIC] Driver auto-auth: ${maskUserId(authUserId)} (socket: ${socket.id})`);
     } else if (authUserId && authRole === 'client') {
       connectedUsers.set(authUserId, socket.id);
@@ -1041,6 +1063,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       socket.driverId = authUserId;
       void rehydrateDriverStatusFromDb(authUserId);
       void emitPendingBatchOffersToDriver(authUserId, socket.id).catch(() => {});
+      notifyClientsOfDriverConnectionState(io, authUserId, true);
       logger.debug(`[DIAGNOSTIC] Driver connecté: ${maskUserId(authUserId)} (socket: ${socket.id})`);
       logger.debug(` - Total drivers connectés: ${connectedDrivers.size}`);
     });

@@ -857,6 +857,19 @@ class UserOrderSocketService {
       }
     });
 
+    // Le livreur a perdu/retrouvé sa connexion socket (backend : orderSocket.ts,
+    // notifyClientsOfDriverConnectionState) — sans ça le marker reste figé sans explication.
+    this.socket.on('driver:connection:status', (data) => {
+      try {
+        const { orderId, connected } = data || {};
+        if (orderId && typeof connected === 'boolean') {
+          useOrderStore.getState().setDriverConnectionStatus(orderId, connected);
+        }
+      } catch (err) {
+        logger.warn('Error handling driver:connection:status', 'userOrderSocketService', err);
+      }
+    });
+
     // Événement de géofencing (livreur entré dans la zone)
     this.socket.on('driver:geofence:event', (data) => {
       try {
@@ -902,6 +915,7 @@ class UserOrderSocketService {
     this.socket.removeAllListeners('no-drivers-available');
     this.socket.removeAllListeners('order:status:update');
     this.socket.removeAllListeners('driver:location:update');
+    this.socket.removeAllListeners('driver:connection:status');
     this.socket.removeAllListeners('resync-order-state');
 
     this.socket.on('connect', () => {
@@ -931,6 +945,7 @@ class UserOrderSocketService {
         this.socket.removeAllListeners('no-drivers-available');
         this.socket.removeAllListeners('order:status:update');
         this.socket.removeAllListeners('driver:location:update');
+    this.socket.removeAllListeners('driver:connection:status');
         this.socket.removeAllListeners('resync-order-state');
       }
 

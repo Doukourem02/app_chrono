@@ -1080,7 +1080,37 @@ Décisions encore ouvertes sur ce chantier : voir section 14 (« Détection de z
 
 ---
 
-## 19. Documents vivants
+## 19. Fiabilité carte/géolocalisation — audit 2026-07-29
+
+L'utilisateur considère le suivi carte comme la fonctionnalité la plus critique du produit ("si les clients n'ont pas l'impression de bien se repérer, ça sera vraiment compliqué"). Audit complet demandé sur le suivi live, l'app livreur, l'ETA/itinéraire, en dehors de l'autocomplétion d'adresse (déjà couverte section 18).
+
+**Constat central** : le socle technique n'est pas du bricolage (interpolation du marker déjà calibrée, throttle position livreur bien pensé, fallback GPS cache→Balanced→Low). Le vrai problème trouvé n'est pas la plomberie GPS mais l'absence de signal quand le suivi se dégrade silencieusement — un client ne perd pas confiance parce que le tracking bug, mais parce que rien ne lui dit "on a un souci" pendant que ça bug. Les 4 points ci-dessous sont corrigés et vérifiés (`tsc` propre sur les 4 apps, tests backend verts).
+
+**1. Le client ne savait jamais que son livreur avait perdu la connexion (bloquant, corrigé).**
+- Constat : `markDriverOfflineAfterSocketGrace` (`orderSocket.ts`) ne notifiait que les admins (`broadcastDriverStatusToAdmins`) après la grâce de 90s ; le client suivant sa commande ne recevait rien, marker figé sans explication.
+- Fix : `notifyClientsOfDriverConnectionState(io, driverId, connected)` émet `driver:connection:status` au client concerné (perte ET reconnexion), sur les 3 points d'entrée (grâce expirée, reconnexion auth, `driver-connect`). Côté client, `useOrderStore.driverConnection` (par commande, avec timestamp) + `DriverConnectionBanner.tsx` affichent un bandeau si déconnecté explicitement OU si aucune position reçue depuis 45s (filet de secours si l'event est manqué).
+
+**2. La permission de localisation arrière-plan du livreur pouvait être refusée sans que personne ne le sache (bloquant, corrigé).**
+- Constat : `driver_krono/app/(tabs)/index.tsx` appelait `requestBackgroundLocationPermissionForDuty()` au passage en ligne mais jetait le retour (`void`). Un livreur choisissant "Autoriser seulement pendant l'utilisation" (courant sur iOS) voyait son GPS s'arrêter dès l'écran verrouillé, sans alerte.
+- Fix : le retour est vérifié ; si refusé, `Alert.alert` explique le risque et propose d'ouvrir les réglages (`Linking.openSettings`, réutilise `openAppLocationSettings` déjà existant).
+
+**3. L'ETA restait figé après un échec Mapbox Directions (gênant, corrigé).**
+- Constat : `useAnimatedRoute.ts` dégradait proprement le tracé en ligne droite en cas d'échec, mais `trafficData` (durée affichée) gardait sa dernière valeur connue sans le signaler — y compris sur le recalcul périodique (toutes les 2 min), dont les erreurs étaient volontairement avalées.
+- Fix : `setTrafficData({ hasTrafficData: false })` sur chaque échec (chargement initial + recalcul périodique) — `calculateFullETA` (`etaCalculator.ts`) bascule alors proprement sur une estimation à vol d'oiseau au lieu d'afficher une durée trafic obsolète.
+
+**4. La recherche de commerces locaux (Overpass/OSM) était verrouillée sur Abidjan, en dur (gênant, corrigé, lié à la section 18).**
+- Constat : `overpassPoiSearch.ts` (copies dupliquées admin/app) ignorait totalement le paramètre `proximity` pour la bbox de recherche (toujours `ABIDJAN_BBOX`), et taguait chaque adresse retournée `, Abidjan` en dur. Plus large que le cas POI curé (section 18) : c'est le mécanisme général sur 20 catégories de commerces (pharmacies, restaurants, écoles...).
+- Fix : bbox dérivée de `proximity` (±0.2° autour de la position réelle, fallback Abidjan si position inconnue), `cityHint` propagé pour le libellé d'adresse. Bonus trouvé en creusant : côté app mobile, le paramètre `proximity` envoyé à Mapbox lui-même (biais de recherche) était dérivé d'une chaîne statique plutôt que de `refCoords` (qui priorise la position GPS réelle) — corrigé aussi, sinon Mapbox restait biaisé Abidjan malgré un `cityHint` correct.
+
+**5. Le livreur mettait bien plus longtemps que le client à savoir que sa propre connexion était instable (gênant, corrigé le 2026-07-29, suite à une question de l'utilisateur sur la synchronicité entre les 4 apps).**
+- Constat : `driver_krono` avait déjà un `RealtimeDegradedBanner.tsx` fonctionnel, mais déclenché uniquement sur `reconnect_failed` — après épuisement des 24 tentatives de reconnexion Socket.IO (délais jusqu'à 10s chacune), potentiellement plusieurs minutes. Le client, lui, est informé en 45-90s (point 1). Un livreur pouvait donc ignorer pendant plusieurs minutes que le client ne le voyait plus.
+- Fix : `orderSocketService.ts` (driver_krono) démarre un timer de 45s au `disconnect` (aligné sur le seuil client) qui active le même `RealtimeDegradedBanner` si toujours déconnecté, sans attendre `reconnect_failed`. Timer nettoyé sur reconnexion et sur `disconnect()` explicite (logout/passage hors ligne).
+
+Statut : les 5 points sont corrigés et vérifiés (`tsc` propre sur les 4 apps, tests backend verts). Pas de décision ouverte supplémentaire issue de cet audit — les 2 déjà notées en section 14 restent les seules côté multi-ville/carte.
+
+---
+
+## 20. Documents vivants
 
 Fichiers vivants dans `docs/` :
 
