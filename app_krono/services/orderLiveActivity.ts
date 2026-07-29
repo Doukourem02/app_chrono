@@ -84,6 +84,7 @@ type LastLiveActivityUpdate = {
   statusLabel?: string;
   progress: number;
   etaLabel: string;
+  connectionDegraded?: boolean;
   at: number;
 };
 
@@ -648,6 +649,7 @@ function sanitizeLiveActivityProps(props: OrderTrackingLiveProps): OrderTracking
     driverPhone: trimLiveActivityText(props.driverPhone, 24),
     bannerClockLabel: trimLiveActivityText(props.bannerClockLabel, 8),
     vehicleMarkerUrl: trimLiveActivityText(props.vehicleMarkerUrl, 512),
+    connectionDegraded: props.connectionDegraded,
   };
 
   if (liveActivityPayloadChars(normalized) <= LIVE_ACTIVITY_SOFT_PAYLOAD_CHAR_LIMIT) {
@@ -674,6 +676,7 @@ function sanitizeLiveActivityProps(props: OrderTrackingLiveProps): OrderTracking
 async function propsFromOrder(
   order: OrderRequest,
   driverCoords?: Coordinates | null,
+  connectionDegraded?: boolean,
 ): Promise<OrderTrackingLiveProps> {
   const status = normalizeOrderStatus(order.status) ?? (order.status as OrderStatus);
   if (status === "pending") {
@@ -734,6 +737,7 @@ async function propsFromOrder(
     driverPhone: digitsForTel(driver?.phone),
     bannerClockLabel: formatBannerClock(order),
     vehicleMarkerUrl: bikerMarkerUri(),
+    connectionDegraded: Boolean(connectionDegraded),
   };
 }
 
@@ -790,11 +794,15 @@ function shouldSkipLiveActivityUpdate(orderId: string, props: OrderTrackingLiveP
   const sameStatus = props.statusCode === lastLiveActivityUpdate.statusCode;
   const sameStatusLabel = props.statusLabel === lastLiveActivityUpdate.statusLabel;
   const sameEta = etaLabel === lastLiveActivityUpdate.etaLabel;
+  const sameConnectionState = Boolean(props.connectionDegraded) === Boolean(lastLiveActivityUpdate.connectionDegraded);
   const elapsedMs = Date.now() - lastLiveActivityUpdate.at;
 
   if (!sameStatus) return false;
   if (!sameStatusLabel) return false;
   if (!sameEta) return false;
+  // Un changement de "signal instable" doit toujours pousser une update, même si l'ETA/statut
+  // n'ont pas bougé (cf. audit carte/géoloc 2026-07-29).
+  if (!sameConnectionState) return false;
   if (sameEta && progressDelta < MIN_PROGRESS_DELTA_FOR_UPDATE) return true;
   return elapsedMs < MIN_LIVE_ACTIVITY_GPS_UPDATE_MS && progressDelta < MIN_PROGRESS_DELTA_FOR_FAST_UPDATE;
 }
@@ -806,6 +814,7 @@ function markLiveActivityUpdated(orderId: string, props: OrderTrackingLiveProps)
     statusLabel: props.statusLabel,
     progress: props.progress ?? 0,
     etaLabel: props.etaLabel ?? "",
+    connectionDegraded: props.connectionDegraded,
     at: Date.now(),
   };
 }
@@ -959,6 +968,8 @@ export type SyncOrderLiveActivityOptions = {
   immediateEnd?: boolean;
   /** Position livreur temps réel : permet une progression fluide entre deux statuts. */
   driverCoords?: Coordinates | null;
+  /** Le flux de positions du livreur s'est arrêté (perte réseau) — cf. useOrderStore.driverConnection. */
+  connectionDegraded?: boolean;
 };
 
 let didWarmNativeBridge = false;
@@ -1016,7 +1027,9 @@ async function syncOrderLiveActivityImpl(
   try {
     await prepareLiveActivityAssets();
     const f = getFactory();
-    const props = sanitizeLiveActivityProps(await propsFromOrder(order!, options.driverCoords));
+    const props = sanitizeLiveActivityProps(
+      await propsFromOrder(order!, options.driverCoords, options.connectionDegraded)
+    );
     propsDebug = {
       propsChars: liveActivityPayloadChars(props),
       hasDriverAvatarUrl: Boolean(props.driverAvatarUrl?.trim()),

@@ -76,6 +76,10 @@ type OrderTrackingLiveProps = {
   driverPhone?: string;
   bannerClockLabel?: string;
   vehicleMarkerUrl?: string;
+  /** Le flux de positions du livreur s'est arrêté sans qu'on sache pourquoi (perte réseau) —
+   * l'ETA/position affichés peuvent être obsolètes. Cf. audit carte/géoloc 2026-07-29 : contrairement
+   * au socket client, ce canal n'avait aucun signal de dégradation avant ce champ. */
+  connectionDegraded?: boolean;
 };
 
 type ApnsResult = {
@@ -573,6 +577,7 @@ async function mergeProps(
   status: string,
   driverCoordsOverride?: Coordinates | null,
   navigationEta?: NavigationEtaOverride | null,
+  connectionDegradedOverride?: boolean,
 ): Promise<OrderTrackingLiveProps> {
   const statusCode = normalizeStatus(status || row?.status || 'pending');
   const pending = statusCode === 'pending';
@@ -614,6 +619,9 @@ async function mergeProps(
     driverPhone: row ? digitsForTel(row.driver_phone) : fallback.driverPhone || '',
     bannerClockLabel: row ? clockLabel(row.created_at) : fallback.bannerClockLabel || '—',
     vehicleMarkerUrl: fallback.vehicleMarkerUrl || '',
+    connectionDegraded: connectionDegradedOverride !== undefined
+      ? connectionDegradedOverride
+      : Boolean(fallback.connectionDegraded),
   };
 }
 
@@ -929,5 +937,55 @@ export async function notifyLiveActivitiesForDriverLocation(params: {
     }
   } catch (error: unknown) {
     logger.warn('[live-activity-apns] notify position:', error instanceof Error ? error.message : String(error));
+  }
+}
+
+/**
+ * Signale (ou lève) un état "connexion livreur dégradée" sur la Live Activity — sans ça, contrairement
+ * au socket client (notifyClientsOfDriverConnectionState, orderSocket.ts), le Dynamic Island/écran
+ * verrouillé continuait d'afficher un ETA/position obsolètes indéfiniment, sans aucun signal, en cas
+ * de perte de connexion livreur. Toujours envoyé immédiatement (pas de throttle position) : ce n'est
+ * pas une mise à jour de position, mais un changement d'état ponctuel (perte ou reconnexion).
+ */
+export async function notifyLiveActivityConnectionState(params: {
+  orderId: string;
+  status: string;
+  payerUserId: string;
+  connectionDegraded: boolean;
+}): Promise<void> {
+  if (!process.env.DATABASE_URL || !isApnsConfigured()) return;
+
+  const { orderId, status, payerUserId, connectionDegraded } = params;
+  const statusNorm = normalizeStatus(status);
+  if (!LIVE_ACTIVITY_ONLY_STATUSES.has(statusNorm)) return;
+
+  try {
+    const tokens = await loadActiveTokens(orderId, payerUserId);
+    if (!tokens.length) return;
+
+    const row = await loadOrder(orderId);
+    if (!row) return;
+
+    for (const token of tokens) {
+      const nextProps = await mergeProps(token.last_props, row, statusNorm, undefined, undefined, connectionDegraded);
+      const result = await sendApnsLiveActivityPush(token.apns_push_token, 'update', nextProps);
+      const detail = result.reason || null;
+      if (result.ok) {
+        await markTokenPushed(token.id, nextProps, 'apns_update_connection_state_ok', null);
+      } else {
+        await markTokenPushed(token.id, nextProps, `apns_update_connection_state_failed_${result.statusCode}`, detail);
+        if (result.statusCode === 400 || result.statusCode === 410) {
+          await invalidateToken(token.id, `apns_invalid_${result.statusCode}`, detail);
+        }
+        logger.warn('[live-activity-apns] push état connexion APNs échoué', {
+          orderIdPrefix: orderId.slice(0, 8),
+          status: statusNorm,
+          httpStatus: result.statusCode,
+          reason: detail,
+        });
+      }
+    }
+  } catch (error: unknown) {
+    logger.warn('[live-activity-apns] notify connection state:', error instanceof Error ? error.message : String(error));
   }
 }

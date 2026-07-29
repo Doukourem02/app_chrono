@@ -68,6 +68,9 @@ export type OrderTrackingLiveProps = {
   bannerClockLabel?: string;
   /** Image locale/packagée utilisée comme indicateur de progression. */
   vehicleMarkerUrl?: string;
+  /** Le flux de positions du livreur s'est arrêté (perte réseau) — ETA/position potentiellement
+   * obsolètes. Cf. audit carte/géoloc 2026-07-29. */
+  connectionDegraded?: boolean;
 };
 
 function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActivityEnvironment) {
@@ -143,6 +146,14 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
 
   const headline = props.isPending ? "Recherche livreur" : clientHeadline(props.statusCode, normalizedEta);
   const shortVehicleInfo = vehicleInfo.length > 31 ? `${vehicleInfo.slice(0, 28)}...` : vehicleInfo;
+  const degradedRow = props.connectionDegraded ? (
+    <HStack spacing={4}>
+      <Image systemName="exclamationmark.triangle.fill" color="#F59E0B" size={10} />
+      <Text modifiers={[font({ weight: "semibold", size: 11 }), foregroundStyle("#F59E0B")]}>
+        Signal instable
+      </Text>
+    </HStack>
+  ) : null;
   const bannerTrackWidth = simplified ? 280 : 310;
   const bannerTraveledWidth = Math.max(16, Math.round(bannerTrackWidth * progress));
   const bannerCarOffset = Math.max(0, Math.min(bannerTrackWidth - markerWidth, bannerTraveledWidth - markerHalf));
@@ -163,6 +174,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
           <Text modifiers={[font({ weight: "medium", size: 12 }), foregroundStyle(ON_DARK.accent), frame({ alignment: "leading" })]}>
             {shortVehicleInfo}
           </Text>
+          {degradedRow}
         </VStack>
         {driverAvatar}
       </HStack>
@@ -199,6 +211,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
           <Text modifiers={[font({ weight: "medium", size: infoSize }), foregroundStyle(ON_DARK.accent), frame({ alignment: "leading" })]}>
             {shortVehicleInfo}
           </Text>
+          {degradedRow}
         </VStack>
         {driverAvatar}
       </HStack>

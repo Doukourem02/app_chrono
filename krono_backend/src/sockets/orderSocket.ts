@@ -12,7 +12,7 @@ import { orderMatchingService } from '../utils/orderMatchingService.js';
 import { canReceiveOrders, deductCommissionAfterDelivery } from '../services/commissionService.js';
 import { notifyAllForOrderStatus } from '../services/recipientOrderNotifyService.js';
 import { notifyB2BBatchRecipientsProof } from '../services/b2bRecipientProofNotifyService.js';
-import { notifyLiveActivitiesForDriverLocation } from '../services/liveActivityApnsService.js';
+import { notifyLiveActivitiesForDriverLocation, notifyLiveActivityConnectionState } from '../services/liveActivityApnsService.js';
 import { autoLogDeliveryMileage } from '../controllers/fleetController.js';
 import logger from '../utils/logger.js';
 import { computeOrderPriceCfa } from '../services/priceCalculator.js';
@@ -290,12 +290,26 @@ function notifyClientsOfDriverConnectionState(io: SocketIOServer, driverId: stri
   const ts = new Date().toISOString();
   for (const order of activeOrders.values()) {
     if (order.driverId !== driverId) continue;
+
     const userSocketId = connectedUsers.get(order.user.id);
-    if (!userSocketId) continue;
-    io.to(userSocketId).emit('driver:connection:status', {
+    if (userSocketId) {
+      io.to(userSocketId).emit('driver:connection:status', {
+        orderId: order.id,
+        connected,
+        ts,
+      });
+    }
+
+    // Indépendant du socket client : la Live Activity (Dynamic Island/écran verrouillé) doit être
+    // prévenue même app en arrière-plan, c'est justement son cas d'usage principal — cf. audit
+    // carte/géoloc 2026-07-29, ce canal n'avait auparavant aucun signal de dégradation.
+    notifyLiveActivityConnectionState({
       orderId: order.id,
-      connected,
-      ts,
+      status: order.status,
+      payerUserId: order.user.id,
+      connectionDegraded: !connected,
+    }).catch((err: unknown) => {
+      logger.warn('[notifyClientsOfDriverConnectionState] Live Activity:', err instanceof Error ? err.message : String(err));
     });
   }
 }

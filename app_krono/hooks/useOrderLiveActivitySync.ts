@@ -28,6 +28,13 @@ export function useOrderLiveActivitySync() {
     const order = pickTrackedOrder(s.activeOrders, s.selectedOrderId);
     return order ? s.driverCoords.get(order.id) ?? null : null;
   });
+  // Alimenté par driver:connection:status (backend) — même signal que DriverConnectionBanner
+  // sur la carte in-app, répercuté ici pour que le Dynamic Island ne reste pas silencieusement
+  // obsolète si le livreur perd sa connexion (cf. audit carte/géoloc 2026-07-29).
+  const trackedConnectionDegraded = useOrderStore((s) => {
+    const order = pickTrackedOrder(s.activeOrders, s.selectedOrderId);
+    return order ? s.driverConnection.get(order.id)?.connected === false : false;
+  });
   const trackedOrder = useMemo(
     () => pickTrackedOrder(activeOrders, selectedOrderId),
     [activeOrders, selectedOrderId]
@@ -36,10 +43,14 @@ export function useOrderLiveActivitySync() {
 
   useEffect(() => {
     if (Platform.OS !== "ios") return;
-    void syncOrderLiveActivity(trackedOrder, { driverCoords: trackedDriverCoords });
+    void syncOrderLiveActivity(trackedOrder, {
+      driverCoords: trackedDriverCoords,
+      connectionDegraded: trackedConnectionDegraded,
+    });
   }, [
     trackedOrder,
     trackedDriverCoords,
+    trackedConnectionDegraded,
     trackedActiveTrackingEta?.phase,
     trackedActiveTrackingEta?.etaLabel,
     trackedActiveTrackingEta?.computedAt,
@@ -50,10 +61,11 @@ export function useOrderLiveActivitySync() {
     if (Platform.OS !== "ios") return;
     const sub = AppState.addEventListener("change", (next) => {
       if (next !== "active") return;
-      const { activeOrders: list, selectedOrderId: sel, driverCoords } = useOrderStore.getState();
+      const { activeOrders: list, selectedOrderId: sel, driverCoords, driverConnection } = useOrderStore.getState();
       const order = pickTrackedOrder(list, sel);
       void syncOrderLiveActivity(order, {
         driverCoords: order ? driverCoords.get(order.id) ?? null : null,
+        connectionDegraded: order ? driverConnection.get(order.id)?.connected === false : false,
       });
     });
     return () => sub.remove();
