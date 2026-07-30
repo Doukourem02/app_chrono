@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import * as Sentry from '@sentry/node';
+import { captureException } from '../utils/errorReporting.js';
 import logger from '../utils/logger.js';
 import { getRequestId } from '../utils/requestContext.js';
 import { AppError } from '../types/index.js';
@@ -44,8 +44,8 @@ export const errorHandler = (
 
   let statusCode = (err as AppError).statusCode || (err as ErrorWithStatus).status || 500;
 
-  if (process.env.SENTRY_DSN && statusCode >= 500) {
-    Sentry.captureException(err, {
+  if (statusCode >= 500) {
+    captureException(err, {
       tags: {
         path: req.path,
         method: req.method,

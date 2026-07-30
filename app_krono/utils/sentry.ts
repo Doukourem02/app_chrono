@@ -2,6 +2,19 @@ import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
 import { config } from '../config/index';
 import { logger } from './logger';
+import {
+  initBetterStackErrorTracking,
+  addBreadcrumbToBetterStack,
+  reportExceptionToBetterStack,
+  reportMessageToBetterStack,
+} from './betterStackReporting';
+
+function getBetterStackDsn(): string | undefined {
+  return (
+    Constants.expoConfig?.extra?.betterStackDsn ||
+    process.env.EXPO_PUBLIC_BETTERSTACK_DSN
+  );
+}
 
 function buildSentryRelease(): string | undefined {
   const slug = Constants.expoConfig?.slug ?? 'app_chrono';
@@ -19,33 +32,37 @@ function buildSentryRelease(): string | undefined {
  * Ne capture les erreurs qu'en production
  */
 export function initSentry() {
-  const sentryDsn = Constants.expoConfig?.extra?.sentryDsn || 
+  const sentryDsn = Constants.expoConfig?.extra?.sentryDsn ||
                     process.env.EXPO_PUBLIC_SENTRY_DSN;
 
   if (!sentryDsn) {
     if (__DEV__) {
       logger.debug('Sentry DSN non configuré - monitoring d\'erreurs désactivé');
     }
-    return;
+  } else {
+    Sentry.init({
+      dsn: sentryDsn,
+      release: buildSentryRelease(),
+      environment: config.app.environment,
+      tracesSampleRate: config.app.environment === 'production' ? 0.1 : 1.0,
+      enableAutoSessionTracking: true,
+      beforeSend(event) {
+        if (__DEV__) {
+          return null;
+        }
+        return event;
+      },
+    });
+
+    if (__DEV__) {
+      logger.debug('Sentry initialisé pour le monitoring d\'erreurs');
+    }
   }
 
-  Sentry.init({
-    dsn: sentryDsn,
-    release: buildSentryRelease(),
-    environment: config.app.environment,
-    tracesSampleRate: config.app.environment === 'production' ? 0.1 : 1.0,
-    enableAutoSessionTracking: true,
-    beforeSend(event) {
-      if (__DEV__) {
-        return null;
-      }
-      return event;
-    },
-  });
-
-  if (__DEV__) {
-    logger.debug('Sentry initialisé pour le monitoring d\'erreurs');
-  }
+  // Better Stack Error Tracking en parallèle de Sentry, pour les erreurs JS
+  // uniquement (les crashs natifs restent gérés par Sentry seul, voir
+  // betterStackReporting.ts).
+  initBetterStackErrorTracking(getBetterStackDsn(), config.app.environment);
 }
 
 function hasSentryDsn(): boolean {
@@ -63,6 +80,7 @@ export function captureError(error: Error, context?: Record<string, any>) {
       extra: context,
     });
   }
+  reportExceptionToBetterStack(error, context);
 }
 
 /**
@@ -72,6 +90,7 @@ export function captureMessage(message: string, level: Sentry.SeverityLevel = 'i
   if (hasSentryDsn()) {
     Sentry.captureMessage(message, level);
   }
+  reportMessageToBetterStack(message, level as 'info' | 'warning' | 'error');
 }
 
 /** Anti-spam : un événement Sentry au plus toutes les 90 s par clé (prod uniquement). */
@@ -85,16 +104,19 @@ export function reportSocketIssue(
   eventKey: string,
   data: Record<string, unknown>
 ): void {
-  if (__DEV__ || !hasSentryDsn()) {
+  if (__DEV__) {
     return;
   }
 
-  Sentry.addBreadcrumb({
-    category: 'socket.io',
-    level: 'error',
-    message: eventKey,
-    data,
-  });
+  if (hasSentryDsn()) {
+    Sentry.addBreadcrumb({
+      category: 'socket.io',
+      level: 'error',
+      message: eventKey,
+      data,
+    });
+  }
+  addBreadcrumbToBetterStack('socket.io', 'error', eventKey, data);
 
   const now = Date.now();
   const last = socketReportLastAt[eventKey] ?? 0;
@@ -103,11 +125,14 @@ export function reportSocketIssue(
   }
   socketReportLastAt[eventKey] = now;
 
-  Sentry.captureMessage(`Socket: ${eventKey}`, {
-    level: 'warning',
-    tags: { socket_event: eventKey },
-    extra: data,
-  });
+  if (hasSentryDsn()) {
+    Sentry.captureMessage(`Socket: ${eventKey}`, {
+      level: 'warning',
+      tags: { socket_event: eventKey },
+      extra: data,
+    });
+  }
+  reportMessageToBetterStack(`Socket: ${eventKey}`, 'warning', data);
 }
 
 /** Breadcrumb info uniquement (pas de captureMessage) — ex. connexion Socket.IO réussie. */
@@ -115,15 +140,18 @@ export function addSocketSuccessBreadcrumb(
   eventKey: string,
   data: Record<string, unknown>
 ): void {
-  if (__DEV__ || !hasSentryDsn()) {
+  if (__DEV__) {
     return;
   }
-  Sentry.addBreadcrumb({
-    category: 'socket.io',
-    level: 'info',
-    message: eventKey,
-    data,
-  });
+  if (hasSentryDsn()) {
+    Sentry.addBreadcrumb({
+      category: 'socket.io',
+      level: 'info',
+      message: eventKey,
+      data,
+    });
+  }
+  addBreadcrumbToBetterStack('socket.io', 'info', eventKey, data);
 }
 
 const liveActivityReportLastAt: Record<string, number> = {};
@@ -137,16 +165,19 @@ export function reportLiveActivityIssue(
   reason: string,
   data: Record<string, unknown>
 ): void {
-  if (__DEV__ || !hasSentryDsn()) {
+  if (__DEV__) {
     return;
   }
 
-  Sentry.addBreadcrumb({
-    category: 'live_activity',
-    level: 'warning',
-    message: reason,
-    data,
-  });
+  if (hasSentryDsn()) {
+    Sentry.addBreadcrumb({
+      category: 'live_activity',
+      level: 'warning',
+      message: reason,
+      data,
+    });
+  }
+  addBreadcrumbToBetterStack('live_activity', 'warning', reason, data);
 
   const now = Date.now();
   const key = reason;
@@ -156,9 +187,12 @@ export function reportLiveActivityIssue(
   }
   liveActivityReportLastAt[key] = now;
 
-  Sentry.captureMessage(`LiveActivity: ${reason}`, {
-    level: 'warning',
-    tags: { live_activity_reason: reason },
-    extra: data,
-  });
+  if (hasSentryDsn()) {
+    Sentry.captureMessage(`LiveActivity: ${reason}`, {
+      level: 'warning',
+      tags: { live_activity_reason: reason },
+      extra: data,
+    });
+  }
+  reportMessageToBetterStack(`LiveActivity: ${reason}`, 'warning', data);
 }

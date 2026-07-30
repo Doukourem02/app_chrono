@@ -136,6 +136,7 @@ const nextConfig: NextConfig = {
       "https://events.mapbox.com",
       "https://*.tiles.mapbox.com",
       "https://nominatim.openstreetmap.org",
+      "https://*.betterstackdata.com",
     ]
 
     // En dev : localhost + origine LAN (HMR WebSocket sur ws://192.168.x.x:3000)

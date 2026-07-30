@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import * as Sentry from '@sentry/node';
+import { captureException } from './utils/errorReporting.js';
 import http from 'http';
 import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
@@ -44,9 +45,7 @@ try {
 } catch (error: any) {
   logger.error('ERREUR CRITIQUE DE SÉCURITÉ:', error);
 
-  if (process.env.SENTRY_DSN) {
-    Sentry.captureException(error);
-  }
+  captureException(error);
 
   process.exit(1);
 }

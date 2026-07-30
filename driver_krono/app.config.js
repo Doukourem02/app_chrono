@@ -151,6 +151,8 @@ module.exports = {
       legalPrivacyUrl: process.env.EXPO_PUBLIC_LEGAL_PRIVACY_URL || '',
       sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN || '',
       EXPO_PUBLIC_SENTRY_DSN: process.env.EXPO_PUBLIC_SENTRY_DSN || '',
+      betterStackDsn: process.env.EXPO_PUBLIC_BETTERSTACK_DSN || '',
+      EXPO_PUBLIC_BETTERSTACK_DSN: process.env.EXPO_PUBLIC_BETTERSTACK_DSN || '',
       betterStackSourceToken:
         process.env.EXPO_PUBLIC_BETTER_STACK_SOURCE_TOKEN || process.env.EXPO_PUBLIC_LOGTAIL_SOURCE_TOKEN || '',
       betterStackIngestUrl: process.env.EXPO_PUBLIC_BETTER_STACK_INGEST_URL || '',
