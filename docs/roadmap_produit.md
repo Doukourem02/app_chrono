@@ -26,6 +26,21 @@ Esquisse de discussion du 2026-07-27, à affiner plus tard, pas encore une déci
 - **Webhooks signés avec retries** — le système du partenaire est notifié automatiquement des changements de statut d'une commande.
 - **WhatsApp bot pour création de commande rapide** — créer une commande en discutant avec un bot WhatsApp, sans ouvrir l'app.
 
+## Branding email — logo Krono dans les clients mail (BIMI)
+
+Actuellement les emails Krono (reset password, etc.) affichent un avatar généré automatiquement ("K" dans un rond) dans Gmail/autres, au lieu du vrai logo Krono (contrairement à LinkedIn par exemple). Le logo est déjà bien présent **dans le corps** des emails (`chrono.png`) — c'est uniquement l'avatar de la liste des mails qui manque. Pas de code à changer, c'est de la config DNS/email (BIMI).
+
+Audit DNS fait le 2026-07-30 sur `mail.kro-no-delivery.com` (domaine d'envoi Supabase Auth, SMTP custom Resend) :
+- DKIM : ✅ configuré (`resend._domainkey.mail.kro-no-delivery.com`)
+- SPF : ✅ configuré (`send.mail.kro-no-delivery.com`)
+- DMARC : ⚠️ présent mais en `p=none` (surveillance seulement, pas d'application)
+- BIMI : ❌ aucun enregistrement, aucun logo SVG conforme
+
+Étapes restantes :
+1. Passer DMARC de `p=none` à `p=quarantine` (prérequis obligatoire pour BIMI) — impacte la remise de tous les emails Krono, à faire avec surveillance.
+2. Créer un logo au format SVG conforme au profil BIMI (SVG Tiny PS — différent d'un export SVG classique) à partir du logo Krono, l'héberger publiquement, publier l'enregistrement DNS `default._bimi.mail.kro-no-delivery.com`.
+3. **Point à trancher** : pour que Gmail affiche vraiment le logo (pas juste accepte l'enregistrement DNS), il faut historiquement un **VMC** (certificat de marque vérifiée, ~1500-2000$/an, exige une marque déposée "Krono"). Sans marque déposée : alternative **CMC** (moins cher, pas besoin de marque déposée, mais support pas garanti à 100% chez tous les fournisseurs mail) — à vérifier l'état du support Gmail au moment de l'implémentation.
+
 ## Phase 3 — ~12 mois et au-delà
 
 - **Marque blanche** (Axe 4) — un partenaire peut habiller l'app à ses propres couleurs/nom.
